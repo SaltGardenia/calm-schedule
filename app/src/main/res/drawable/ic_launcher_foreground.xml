@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 启动图标前景：简化课表格子图案 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group android:translateX="24" android:translateY="24">
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M4,4 h24 v24 h-24 z M4,4 h24 v6 h-24 z" />
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M8,14 h8 v6 h-8 z" />
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M18,14 h8 v10 h-8 z" />
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M8,22 h8 v4 h-8 z" />
+    </group>
+</vector>
