@@ -1,0 +1,30 @@
+package com.saltgarden.kechengbiao.importer.model
+
+/** 导入过程中的中间课程表示（尚未入库） */
+data class ImportCourse(
+    val name: String,
+    val teacher: String = "",
+    val room: String = "",
+    /** 1=周一 … 7=周日 */
+    val day: Int,
+    val startNode: Int,
+    val endNode: Int,
+    val weeks: Set<Int>,
+)
+
+/** 一次解析的结果：课程列表 + 来源描述 */
+data class ParsedSchedule(
+    val courses: List<ImportCourse>,
+    val sourceName: String,
+    val systemId: String = "",
+)
+
+class ImportException(message: String) : Exception(message)
+
+/** 支持的导入通道 */
+enum class SchoolSystem(val id: String, val label: String, val hint: String) {
+    ZF_NEW("zf_new", "正方教务（新版）", "地址形如 jwgl.xxx.edu.cn/jwglxt"),
+    ZF_OLD("zf_old", "正方教务（旧版）", "地址形如 jw.xxx.edu.cn（default2.aspx 登录）"),
+    QZ("qz", "强智教务", "地址形如 jw.xxx.edu.cn/jsxsd"),
+    WEB("web", "网页登录（通用兜底）", "任意教务系统（含统一认证/金智 EAMS）：登录后自动抓取页面解析，如 HFUT：jxglstu.hfut.edu.cn/eams5-student"),
+}
