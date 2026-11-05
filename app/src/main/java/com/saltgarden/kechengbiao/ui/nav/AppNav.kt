@@ -61,7 +61,8 @@ fun AppNav() {
             composable(Screen.Settings.route) {
                 SettingsScreen(
                     vm = settingsVm,
-                    onBack = { navController.popBackStack() }
+                    onBack = { navController.popBackStack() },
+                    onGoImport = { navController.navigate(Screen.Import.route) }
                 )
             }
         }

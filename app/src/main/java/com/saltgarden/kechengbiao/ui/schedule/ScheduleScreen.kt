@@ -28,12 +28,12 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.Event
 import androidx.compose.material3.Icon
@@ -167,11 +167,6 @@ fun ScheduleScreen(
                 )
                 Spacer(Modifier.width(6.dp))
                 GlassIconButton(
-                    Icons.Filled.Download, "导入课表", onGoImport,
-                    size = 32.dp, iconSize = 18.dp,
-                )
-                Spacer(Modifier.width(4.dp))
-                GlassIconButton(
                     Icons.Filled.Settings, "设置", onGoSettings,
                     size = 32.dp, iconSize = 18.dp,
                 )
@@ -183,7 +178,7 @@ fun ScheduleScreen(
             val days = if (table?.showWeekend == false) (1..5) else (1..7)
 
             // 星期表头
-            Row(Modifier.fillMaxWidth().padding(top = 4.dp)) {
+            Row(Modifier.fillMaxWidth().padding(top = 12.dp)) {
                 Spacer(Modifier.width(TIME_COL_WIDTH))
                 days.forEach { d ->
                     val date = dates?.getOrNull(d - 1)
@@ -198,12 +193,30 @@ fun ScheduleScreen(
                             fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal,
                             color = if (isToday) MaterialTheme.colorScheme.primary else Color.Unspecified
                         )
-                        Text(
-                            date?.let { WeekCalculator.formatDate(it) } ?: "",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = if (isToday) MaterialTheme.colorScheme.primary
-                            else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        if (isToday && date != null) {
+                            // 今天的日期放进实心圆徽标，远比单纯换色醒目
+                            Box(
+                                Modifier
+                                    .padding(top = 2.dp)
+                                    .size(22.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.primary),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    date.dayOfMonth.toString(),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onPrimary
+                                )
+                            }
+                        } else {
+                            Text(
+                                date?.let { WeekCalculator.formatDate(it) } ?: "",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 }
             }
