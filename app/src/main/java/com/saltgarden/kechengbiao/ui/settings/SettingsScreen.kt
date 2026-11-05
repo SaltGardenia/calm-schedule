@@ -244,21 +244,22 @@ fun SettingsScreen(vm: SettingsViewModel, onBack: () -> Unit, onGoImport: () -> 
                                 .fillMaxWidth()
                                 .padding(vertical = 6.dp)
                         ) {
-                            // 点击课表名可重命名
+                            // 点击课表名切换使用
                             Text(
-                                t.name,
+                                t.name + if (t.id == table?.id) "（使用中）" else "",
                                 Modifier
                                     .weight(1f)
                                     .clip(RoundedCornerShape(8.dp))
                                     .clickable {
-                                        renameText = t.name
-                                        renameTarget = t
+                                        vm.switchTable(t.id)
+                                        showTablePicker = false
                                     }
                                     .padding(vertical = 4.dp)
                             )
-                            TextButton(onClick = { vm.switchTable(t.id); showTablePicker = false }) {
-                                Text(if (t.id == table?.id) "使用中" else "切换")
-                            }
+                            TextButton(onClick = {
+                                renameText = t.name
+                                renameTarget = t
+                            }) { Text("重命名") }
                             // 红色垃圾桶：删除入口，点击后二次确认
                             IconButton(onClick = { deleteTarget = t }) {
                                 Icon(
