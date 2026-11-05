@@ -178,6 +178,15 @@ fun ScheduleScreen(
             val dates = table?.let { WeekCalculator.weekDates(it.termStartDate, week) }
             val days = if (table?.showWeekend == false) (1..5) else (1..7)
 
+            // 预解析周次、按天/按日期分组：翻页时每列不再重复解析 CSV 与过滤全量列表
+            val coursesByDay = remember(courses) {
+                courses.map { c -> c to WeekCalculator.parseWeeks(c.weeks) }
+                    .groupBy { it.first.day }
+            }
+            val eventsByDate = remember(events) {
+                events.groupBy { it.date }.mapValues { (_, list) -> list.sortedBy { it.startMinute } }
+            }
+
             // 星期表头（与顶栏、下方课程区都留出呼吸间距）
             Row(Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 10.dp)) {
                 Spacer(Modifier.width(TIME_COL_WIDTH))
@@ -223,24 +232,28 @@ fun ScheduleScreen(
             }
 
             Box(Modifier.weight(1f)) {
-                HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
-                    val w = page + 1
-                    val pageDates = table?.let { WeekCalculator.weekDates(it.termStartDate, w) }
-                    Row(
-                        Modifier.fillMaxSize().verticalScroll(rememberScrollState())
-                    ) {
-                        TimeColumn(timeline)
-                        days.forEach { d ->
-                            val date = pageDates?.getOrNull(d - 1)
-                            DayColumn(
-                                day = d,
-                                week = w,
-                                date = date,
-                                timeline = timeline,
-                                nodeTimes = nodeTimes,
-                                courses = courses,
-                                events = events,
-                                showOtherWeek = table?.showOtherWeek ?: false,
+                // 纵向滚动提到 Pager 外层共享：斜向滑动时横向翻页更容易接管，
+                // 且省去每页独立的滚动状态与重复过滤
+                Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+                    HorizontalPager(
+                        state = pagerState,
+                        modifier = Modifier.fillMaxWidth().height(timeline.height),
+                    ) { page ->
+                        val w = page + 1
+                        val pageDates = table?.let { WeekCalculator.weekDates(it.termStartDate, w) }
+                        Row(Modifier.fillMaxSize()) {
+                            TimeColumn(timeline)
+                            days.forEach { d ->
+                                val date = pageDates?.getOrNull(d - 1)
+                                DayColumn(
+                                    day = d,
+                                    week = w,
+                                    date = date,
+                                    timeline = timeline,
+                                    nodeTimes = nodeTimes,
+                                    dayCourses = coursesByDay[d] ?: emptyList(),
+                                    dayEvents = eventsByDate[date?.toString()] ?: emptyList(),
+                                    showOtherWeek = table?.showOtherWeek ?: false,
                                 onCourseClick = { detailCourse = it },
                                 onEventClick = { detailEvent = it },
                                 onQuickAddCourse = { day, node ->
@@ -260,6 +273,7 @@ fun ScheduleScreen(
                                 },
                             )
                         }
+                    }
                     }
                 }
 
@@ -390,7 +404,8 @@ private fun TimeColumn(timeline: Timeline) {
     }
 }
 
-/** 一天的课程列：整点分割线；长按建课，长按后滑动按半小时选择日程 */
+/** 一天的课程列：整点分割线；长按建课，长按后滑动按半小时选择日程。
+ *  dayCourses 已按天分组并预解析周次，dayEvents 已按日期分组排序，翻页时只做轻量筛选 */
 @Composable
 private fun RowScope.DayColumn(
     day: Int,
@@ -398,8 +413,8 @@ private fun RowScope.DayColumn(
     date: LocalDate?,
     timeline: Timeline,
     nodeTimes: List<Pair<String, String>>,
-    courses: List<CourseEntity>,
-    events: List<EventEntity>,
+    dayCourses: List<Pair<CourseEntity, Set<Int>>>,
+    dayEvents: List<EventEntity>,
     showOtherWeek: Boolean,
     onCourseClick: (CourseEntity) -> Unit,
     onEventClick: (EventEntity) -> Unit,
@@ -409,16 +424,9 @@ private fun RowScope.DayColumn(
     val density = LocalDensity.current
     val hourHeightPx = with(density) { HOUR_HEIGHT.toPx() }
     val haptics = LocalHapticFeedback.current
-    val inWeek = courses.filter {
-        it.day == day && WeekCalculator.parseWeeks(it.weeks).contains(week)
-    }
-    val otherWeek = courses.filter {
-        it.day == day && !WeekCalculator.parseWeeks(it.weeks).contains(week)
-    }
+    val inWeek = dayCourses.filter { week in it.second }.map { it.first }
+    val otherWeek = dayCourses.filterNot { week in it.second }.map { it.first }
     val dateKey = date?.toString()
-    val dayEvents = remember(events, dateKey) {
-        if (dateKey == null) emptyList() else events.filter { it.date == dateKey }.sortedBy { it.startMinute }
-    }
 
     // 滑动选择（半小时吸附）
     var selStartMin by remember { mutableIntStateOf(-1) }
