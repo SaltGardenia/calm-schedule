@@ -289,6 +289,18 @@ class ImportViewModel(app: Application) : AndroidViewModel(app) {
             if (replace) container.repository.importReplace(tableId, entities)
             else container.repository.importMerge(tableId, entities)
 
+            // 导入的节次超出当前"每日节数"时，自动扩展节数与作息，
+            // 否则超出部分的节次会落到 08:00 起的兜底网格（显示成"时间倒流"）
+            val maxNode = entities.maxOfOrNull { it.endNode } ?: 0
+            container.repository.getTable(tableId)?.let { t ->
+                if (maxNode > t.nodeCount) {
+                    val csv = WeekCalculator.ensureNodeTimes(
+                        t.nodeTimes.ifBlank { WeekCalculator.defaultNodeTimes() }, maxNode
+                    ).joinToString(",") { "${it.first}-${it.second}" }
+                    container.repository.updateTable(t.copy(nodeCount = maxNode, nodeTimes = csv))
+                }
+            }
+
             // JSON 导入若带开学日期/作息，则同步课表设置
             if (parsed.systemId == "json") {
                 JsonIO.parse(rawJsonForExport ?: return@launch)?.let { dto ->

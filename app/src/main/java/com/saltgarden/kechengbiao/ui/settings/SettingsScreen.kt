@@ -244,15 +244,16 @@ fun SettingsScreen(vm: SettingsViewModel, onBack: () -> Unit, onGoImport: () -> 
                                 .fillMaxWidth()
                                 .padding(vertical = 6.dp)
                         ) {
-                            // 点击课表名切换使用
+                            // 点击课表名切换使用，切换后直接返回课表页
                             Text(
                                 t.name + if (t.id == table?.id) "（使用中）" else "",
                                 Modifier
                                     .weight(1f)
                                     .clip(RoundedCornerShape(8.dp))
                                     .clickable {
-                                        vm.switchTable(t.id)
+                                        if (t.id != table?.id) vm.switchTable(t.id)
                                         showTablePicker = false
+                                        onBack()
                                     }
                                     .padding(vertical = 4.dp)
                             )
