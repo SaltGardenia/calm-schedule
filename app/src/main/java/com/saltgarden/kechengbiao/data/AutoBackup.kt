@@ -92,7 +92,14 @@ class AutoBackup(
         db.withTransaction {
             backup.tables.forEach { db.tableDao().insert(it) }
             if (backup.courses.isNotEmpty()) db.courseDao().insertAll(backup.courses)
-            if (backup.events.isNotEmpty()) db.eventDao().insertAll(backup.events)
+            if (backup.events.isNotEmpty()) {
+                // 旧版备份的日程没有 tableId（=0），统一归到第一张课表
+                val fallbackTableId = backup.activeTableId.takeIf { it > 0 }
+                    ?: backup.tables.first().id
+                db.eventDao().insertAll(
+                    backup.events.map { if (it.tableId == 0L) it.copy(tableId = fallbackTableId) else it }
+                )
+            }
         }
         backup.activeTableId.takeIf { it > 0 } ?: backup.tables.first().id
     }

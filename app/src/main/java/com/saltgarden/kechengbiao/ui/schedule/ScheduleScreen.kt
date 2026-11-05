@@ -277,6 +277,7 @@ fun ScheduleScreen(
                                 },
                                 onAddEvent = { dateOfEvent, startMinute, endMinute ->
                                     editEvent = EventEntity(
+                                        tableId = table?.id ?: 0,
                                         date = dateOfEvent.toString(),
                                         startMinute = startMinute,
                                         endMinute = endMinute,

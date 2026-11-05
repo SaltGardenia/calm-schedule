@@ -52,9 +52,11 @@ class ScheduleViewModel(app: Application) : AndroidViewModel(app) {
         combine(container.settings.timelineStart, container.settings.timelineEnd) { s, e -> s to e }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "" to "")
 
-    /** 全部一次性日程（按日期存储，界面按当前页日期过滤展示） */
-    val events: StateFlow<List<EventEntity>> = repo.observeEvents()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    /** 当前课表的一次性日程（日程归属创建时的课表，切课表互不可见） */
+    val events: StateFlow<List<EventEntity>> =
+        combine(repo.observeEvents(), table) { all, t ->
+            if (t == null) emptyList() else all.filter { it.tableId == t.id }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     init {
         viewModelScope.launch {

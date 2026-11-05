@@ -84,6 +84,8 @@ data class CourseEntity(
 @Serializable
 data class EventEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    /** 所属课表（日程只在创建它的课表里显示） */
+    @ColumnInfo(name = "tableId") val tableId: Long = 0,
     /** 具体日期，ISO 格式 yyyy-MM-dd */
     val date: String,
     /** 开始时间：当天 0 点起的分钟数（如 14:30 → 870） */

@@ -7,7 +7,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
     entities = [TableEntity::class, CourseEntity::class, EventEntity::class],
-    version = 4,
+    version = 5,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -56,6 +56,17 @@ abstract class AppDatabase : RoomDatabase() {
         val MIGRATION_3_4 = object : Migration(3, 4) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("UPDATE timetables SET showOtherWeek = 0")
+            }
+        }
+
+        /** v4 → v5：日程归属课表（存量日程归到第一张课表） */
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `events` ADD COLUMN `tableId` INTEGER NOT NULL DEFAULT 0")
+                db.execSQL(
+                    "UPDATE `events` SET `tableId` = " +
+                        "COALESCE((SELECT MIN(id) FROM timetables), 0) WHERE `tableId` = 0"
+                )
             }
         }
     }
