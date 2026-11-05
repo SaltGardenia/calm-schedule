@@ -26,7 +26,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       - name: Build APK
-        run: ./gradlew :app:assembleDebug --no-daemon
+        run: bash ./gradlew :app:assembleDebug --no-daemon
 
       - name: Rename APK
         run: |
