@@ -264,11 +264,14 @@ fun ScheduleScreen(
                 val areaHeight = maxHeight
                 // 纵向滚动提到 Pager 外层共享：斜向滑动时横向翻页更容易接管，
                 // 且省去每页独立的滚动状态与重复过滤；
-                // Pager 高度至少占满视口——时间轴下方的空白区域同样可以左右滑动翻页
+                // Pager 高度 = max(时间轴高度, 视口高度)：时间轴下方的空白区域同样可以左右滑动翻页。
+                // 必须用显式高度——heightIn(min) 会让 Pager 把较矮的页面垂直居中，网格整体下坠
                 Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
                     HorizontalPager(
                         state = pagerState,
-                        modifier = Modifier.fillMaxWidth().heightIn(min = areaHeight),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(timeline.height.coerceAtLeast(areaHeight)),
                     ) { page ->
                         val w = page + 1
                         val pageDates = table?.let { WeekCalculator.weekDates(it.termStartDate, w) }
