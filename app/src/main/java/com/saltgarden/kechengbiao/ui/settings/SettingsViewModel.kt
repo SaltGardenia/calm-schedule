@@ -75,7 +75,11 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
         table.value?.let { repo.updateTable(transform(it)) }
     }
 
-    fun renameTable(name: String) = updateTable { it.copy(name = name) }
+    fun renameTable(id: Long, name: String) = viewModelScope.launch {
+        tables.value.firstOrNull { it.id == id }?.let {
+            repo.updateTable(it.copy(name = name))
+        }
+    }
     fun setTermStart(date: LocalDate) = updateTable {
         it.copy(termStartDate = date.atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli())
     }

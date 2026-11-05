@@ -17,6 +17,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.AlertDialog
@@ -50,6 +51,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.saltgarden.kechengbiao.core.time.EventTime
 import com.saltgarden.kechengbiao.core.time.WeekCalculator
+import com.saltgarden.kechengbiao.data.TableEntity
 import com.saltgarden.kechengbiao.ui.theme.GlassDialog
 import com.saltgarden.kechengbiao.ui.theme.GlassDialogButton
 import com.saltgarden.kechengbiao.ui.theme.GlassIconButton
@@ -67,6 +69,9 @@ fun SettingsScreen(vm: SettingsViewModel, onBack: () -> Unit, onGoImport: () -> 
     var showNodeTimesEditor by remember { mutableStateOf(false) }
     var showTablePicker by remember { mutableStateOf(false) }
     var showRangeEditor by remember { mutableStateOf(false) }
+    var renameTarget by remember { mutableStateOf<TableEntity?>(null) }
+    var renameText by remember { mutableStateOf("") }
+    var deleteTarget by remember { mutableStateOf<TableEntity?>(null) }
 
     val timelineStart by vm.timelineStart.collectAsState()
     val timelineEnd by vm.timelineEnd.collectAsState()
@@ -175,19 +180,6 @@ fun SettingsScreen(vm: SettingsViewModel, onBack: () -> Unit, onGoImport: () -> 
                 OutlinedButton(onClick = { showNodeTimesEditor = true }) { Text("编辑作息") }
             }
 
-            // 关于
-            GlassSection {
-                SectionTitle("关于")
-                Text(
-                    "不烧心课程表 1.0.0 · 液态玻璃版\n" +
-                        "教务系统适配：正方（新/旧）、强智、网页通用兜底；支持 JSON/CSV/文本快速导入；" +
-                        "课表空白区域长按滑动可添加一次性日程。\n" +
-                        "参考项目：WakeUp 课程表（BUPT 分支源码）、openschoolcn/zfn_api。",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-
             Spacer(Modifier.height(24.dp))
         }
     }
@@ -252,16 +244,29 @@ fun SettingsScreen(vm: SettingsViewModel, onBack: () -> Unit, onGoImport: () -> 
                                 .fillMaxWidth()
                                 .padding(vertical = 6.dp)
                         ) {
+                            // 点击课表名可重命名
                             Text(
-                                "${t.name}（${t.id}）",
-                                Modifier.weight(1f)
+                                t.name,
+                                Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable {
+                                        renameText = t.name
+                                        renameTarget = t
+                                    }
+                                    .padding(vertical = 4.dp)
                             )
                             TextButton(onClick = { vm.switchTable(t.id); showTablePicker = false }) {
                                 Text(if (t.id == table?.id) "使用中" else "切换")
                             }
-                            TextButton(onClick = {
-                                if (tables.size > 1) vm.deleteTable(t.id)
-                            }) { Text("删") }
+                            // 红色垃圾桶：删除入口，点击后二次确认
+                            IconButton(onClick = { deleteTarget = t }) {
+                                Icon(
+                                    Icons.Filled.Delete,
+                                    contentDescription = "删除课表",
+                                    tint = Color(0xFFE53935),
+                                )
+                            }
                         }
                     }
                 }
@@ -270,6 +275,59 @@ fun SettingsScreen(vm: SettingsViewModel, onBack: () -> Unit, onGoImport: () -> 
                 TextButton(onClick = { showTablePicker = false }) { Text("关闭") }
             }
         )
+    }
+
+    // 课表重命名
+    renameTarget?.let { t ->
+        GlassDialog(onDismissRequest = { renameTarget = null }) {
+            Text("重命名课表", style = MaterialTheme.typography.titleLarge)
+            OutlinedTextField(
+                value = renameText,
+                onValueChange = { renameText = it },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Row(
+                Modifier.fillMaxWidth().padding(top = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                GlassDialogButton("取消", onClick = { renameTarget = null })
+                GlassDialogButton(
+                    "保存",
+                    enabled = renameText.isNotBlank(),
+                    primary = true,
+                    onClick = {
+                        vm.renameTable(t.id, renameText.trim())
+                        renameTarget = null
+                    }
+                )
+            }
+        }
+    }
+
+    // 删除课表二次确认
+    deleteTarget?.let { t ->
+        GlassDialog(onDismissRequest = { deleteTarget = null }) {
+            Text("删除课表", style = MaterialTheme.typography.titleLarge)
+            Text(
+                "确定删除「${t.name}」及其全部课程？删除后不可恢复。",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Row(
+                Modifier.fillMaxWidth().padding(top = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                GlassDialogButton("取消", onClick = { deleteTarget = null })
+                GlassDialogButton(
+                    "删除",
+                    destructive = true,
+                    onClick = {
+                        deleteTarget = null
+                        if (tables.size > 1) vm.deleteTable(t.id)
+                    }
+                )
+            }
+        }
     }
 }
 
