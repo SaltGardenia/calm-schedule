@@ -12,11 +12,13 @@ data class ImportCourse(
     val weeks: Set<Int>,
 )
 
-/** 一次解析的结果：课程列表 + 来源描述 */
+/** 一次解析的结果：课程列表 + 来源描述；部分来源可附带学校真实作息（逐节起止） */
 data class ParsedSchedule(
     val courses: List<ImportCourse>,
     val sourceName: String,
     val systemId: String = "",
+    /** 学校真实作息（"08:00" to "08:45" 列表）；null = 未知，保留课表现有作息 */
+    val nodeTimes: List<Pair<String, String>>? = null,
 )
 
 class ImportException(message: String) : Exception(message)

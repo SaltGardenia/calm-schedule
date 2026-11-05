@@ -44,4 +44,34 @@ class EamsParserTest {
         assertEquals("eams", parsed!!.systemId)
         assertEquals(3, parsed.courses.size)
     }
+
+    @Test
+    fun `从页面网格提取学校真实作息`() {
+        // 结构取自真实抓取页面（blank-unit 每天重复一份，紧凑时间 800=08:00 / 1455=14:55）
+        val html = """
+            <html><body>
+            <div class="course-table">
+              <div class="blank-unit" start-time="800" end-time="845"></div>
+              <div class="blank-unit" start-time="855" end-time="940"></div>
+              <div class="blank-unit" start-time="1000" end-time="1045"></div>
+              <div class="blank-unit" start-time="1055" end-time="1140"></div>
+              <div class="blank-unit" start-time="1400" end-time="1445"></div>
+              <div class="blank-unit" start-time="1455" end-time="1540"></div>
+              <div class="blank-unit" start-time="800" end-time="845"></div>
+              <div class="blank-unit" start-time="855" end-time="940"></div>
+              <div class="blank-unit" start-time="1000" end-time="1045"></div>
+              <div class="blank-unit" start-time="1055" end-time="1140"></div>
+              <div class="blank-unit" start-time="1400" end-time="1445"></div>
+              <div class="blank-unit" start-time="1455" end-time="1540"></div>
+            </div>
+            </body></html>
+        """.trimIndent()
+        val times = com.saltgarden.kechengbiao.importer.eams.EamsParser.extractNodeTimes(html)
+        assertNotNull(times)
+        // 每天重复的网格去重后得到 6 节
+        assertEquals(6, times!!.size)
+        assertEquals("08:00" to "08:45", times[0])
+        assertEquals("14:00" to "14:45", times[4])
+        assertEquals("14:55" to "15:40", times[5])
+    }
 }

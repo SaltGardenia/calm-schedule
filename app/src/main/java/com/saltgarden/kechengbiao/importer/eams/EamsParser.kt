@@ -107,4 +107,33 @@ object EamsParser {
         val e = ((endMinute - 8 * 60) / 45 + 1).coerceIn(s, 16)
         return s to e
     }
+
+    /**
+     * 从页面网格的 blank-unit 提取学校真实作息（每节起止时间）：
+     *   <div class="blank-unit" start-time="800" end-time="845">
+     * 时间为 "hmm" 紧凑格式（800=08:00，1455=14:55）。每天重复一份，去重后得到逐节作息。
+     */
+    fun extractNodeTimes(html: String): List<Pair<String, String>>? {
+        val doc = Jsoup.parse(html)
+        val units = doc.select("div.blank-unit[start-time]").map { it.attr("start-time") to it.attr("end-time") }
+        if (units.size < 4) return null
+        val out = mutableListOf<Pair<String, String>>()
+        for ((s, e) in units) {
+            val pair = formatCompact(s) to formatCompact(e)
+            // 网格按星期重复一整套 blank-unit，按全集去重（保序）
+            if (pair !in out) out.add(pair)
+        }
+        return out.takeIf { it.size >= 4 }
+    }
+
+    /** "800" → "08:00"，"1455" → "14:55"，"45"（纯分钟）→ "00:45" */
+    private fun formatCompact(raw: String): String {
+        val v = raw.filter { it.isDigit() }
+        val (h, m) = when (v.length) {
+            in 0..2 -> 0 to (v.toIntOrNull() ?: 0)
+            3 -> v.substring(0, 1).toInt() to v.substring(1).toInt()
+            else -> v.substring(0, v.length - 2).toInt() to v.takeLast(2).toInt()
+        }
+        return "%02d:%02d".format(h.coerceIn(0, 47), m.coerceIn(0, 59))
+    }
 }

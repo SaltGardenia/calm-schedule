@@ -290,10 +290,18 @@ class ImportViewModel(app: Application) : AndroidViewModel(app) {
             else container.repository.importMerge(tableId, entities)
 
             // 导入的节次超出当前"每日节数"时，自动扩展节数与作息，
-            // 否则超出部分的节次会落到 08:00 起的兜底网格（显示成"时间倒流"）
+            // 否则超出部分的节次会落到 08:00 起的兜底网格（显示成"时间倒流"）；
+            // 来源页面自带学校真实作息时（如金智 EAMS），一并写入课表
             val maxNode = entities.maxOfOrNull { it.endNode } ?: 0
             container.repository.getTable(tableId)?.let { t ->
-                if (maxNode > t.nodeCount) {
+                val schoolTimes = parsed.nodeTimes
+                if (schoolTimes != null && schoolTimes.size >= maxNode) {
+                    val count = maxOf(t.nodeCount, schoolTimes.size)
+                    val csv = WeekCalculator.ensureNodeTimes(
+                        schoolTimes.joinToString(",") { "${it.first}-${it.second}" }, count
+                    ).joinToString(",") { "${it.first}-${it.second}" }
+                    container.repository.updateTable(t.copy(nodeCount = count, nodeTimes = csv))
+                } else if (maxNode > t.nodeCount) {
                     val csv = WeekCalculator.ensureNodeTimes(
                         t.nodeTimes.ifBlank { WeekCalculator.defaultNodeTimes() }, maxNode
                     ).joinToString(",") { "${it.first}-${it.second}" }

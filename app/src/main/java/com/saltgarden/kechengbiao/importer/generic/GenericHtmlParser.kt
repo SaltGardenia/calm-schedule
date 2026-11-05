@@ -31,6 +31,12 @@ object GenericHtmlParser {
             .map { (name, sysId, f) -> ParsedSchedule(f(), name, sysId) }
             .filter { it.courses.isNotEmpty() }
             .maxByOrNull { it.courses.size }
+            ?.let { best ->
+                // 金智 EAMS 页面网格自带学校真实作息，一并带出
+                if (best.systemId == "eams") {
+                    best.copy(nodeTimes = com.saltgarden.kechengbiao.importer.eams.EamsParser.extractNodeTimes(html))
+                } else best
+            }
     }
 
     /**
