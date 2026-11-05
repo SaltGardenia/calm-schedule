@@ -116,15 +116,22 @@ fun ScheduleScreen(
     }
     val rangeOverride by vm.timelineRange.collectAsStateWithLifecycle()
     val showLunchBreak by vm.showLunchBreak.collectAsStateWithLifecycle()
-    val timeline = remember(nodeTimes, rangeOverride, showLunchBreak) {
+    val timeline = remember(nodeTimes, rangeOverride, showLunchBreak, courses, events) {
         val (startText, endText) = rangeOverride
         val start = EventTime.parseMinutes(startText)
         val end = EventTime.parseMinutes(endText)
         val base = if (start != null && end != null && end > start) Timeline(start, end)
         else Timeline.of(nodeTimes)
-        // 「显示午休时段」关闭（默认）时把 12:00-14:00 折叠成窄条；需时间轴完整覆盖该时段
+        // 「显示午休时段」关闭（默认）时把 12:00-14:00 折叠成窄条。
+        // 但若本课表在午休时段排了课程或日程（任一周），则不折叠，避免把课压扁。
         val lunch = 12 * 60..14 * 60
-        if (!showLunchBreak && base.startMinute <= lunch.first && base.endMinute >= lunch.last + 1) {
+        val lunchBusy = courses.any { c ->
+            nodeStartMinute(c.startNode, nodeTimes) < lunch.last &&
+                nodeEndMinute(c.endNode, nodeTimes) > lunch.first
+        } || events.any { it.startMinute < lunch.last && it.endMinute > lunch.first }
+        if (!showLunchBreak && !lunchBusy &&
+            base.startMinute <= lunch.first && base.endMinute >= lunch.last + 1
+        ) {
             base.copy(collapsed = lunch)
         } else base
     }
