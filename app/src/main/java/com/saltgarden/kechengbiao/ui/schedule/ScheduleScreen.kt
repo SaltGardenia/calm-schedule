@@ -114,12 +114,18 @@ fun ScheduleScreen(
         )
     }
     val rangeOverride by vm.timelineRange.collectAsStateWithLifecycle()
-    val timeline = remember(nodeTimes, rangeOverride) {
+    val hideLunchBreak by vm.hideLunchBreak.collectAsStateWithLifecycle()
+    val timeline = remember(nodeTimes, rangeOverride, hideLunchBreak) {
         val (startText, endText) = rangeOverride
         val start = EventTime.parseMinutes(startText)
         val end = EventTime.parseMinutes(endText)
-        if (start != null && end != null && end > start) Timeline(start, end)
+        val base = if (start != null && end != null && end > start) Timeline(start, end)
         else Timeline.of(nodeTimes)
+        // 折叠午休：仅当时间轴完整覆盖 12:00-14:00 时生效
+        val lunch = 12 * 60..14 * 60
+        if (hideLunchBreak && base.startMinute <= lunch.first && base.endMinute >= lunch.last + 1) {
+            base.copy(collapsed = lunch)
+        } else base
     }
 
     // todayWeek 是异步加载的 StateFlow（初值 1）：课表就绪后一次性跳到"本周"。

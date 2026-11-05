@@ -52,6 +52,10 @@ class ScheduleViewModel(app: Application) : AndroidViewModel(app) {
         combine(container.settings.timelineStart, container.settings.timelineEnd) { s, e -> s to e }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "" to "")
 
+    /** 折叠午休时段（12:00-14:00 从时间轴压缩），默认关闭 */
+    val hideLunchBreak: StateFlow<Boolean> = container.settings.hideLunchBreak
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
     /** 当前课表的一次性日程（日程归属创建时的课表，切课表互不可见） */
     val events: StateFlow<List<EventEntity>> =
         combine(repo.observeEvents(), table) { all, t ->

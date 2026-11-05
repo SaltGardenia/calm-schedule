@@ -42,8 +42,16 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     val timelineEnd: StateFlow<String> = container.settings.timelineEnd
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "")
 
+    /** 折叠午休时段（12:00-14:00） */
+    val hideLunchBreak: StateFlow<Boolean> = container.settings.hideLunchBreak
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
     fun setTimelineRange(start: String, end: String) = viewModelScope.launch {
         container.settings.setTimelineRange(start, end)
+    }
+
+    fun setHideLunchBreak(v: Boolean) = viewModelScope.launch {
+        container.settings.setHideLunchBreak(v)
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)

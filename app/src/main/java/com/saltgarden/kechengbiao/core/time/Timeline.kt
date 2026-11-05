@@ -14,33 +14,60 @@ data class Timeline(
     val startMinute: Int,
     val endMinute: Int,
     val hourHeight: Dp = 62.dp,
+    /** 折叠时段（如 720..840 表示 12:00-14:00 午休从时间轴中压缩掉）；null = 不折叠 */
+    val collapsed: IntRange? = null,
 ) {
     init {
         require(endMinute > startMinute) { "时间轴范围非法" }
+        require(collapsed == null || (collapsed.first >= startMinute && collapsed.last < endMinute)) {
+            "折叠时段必须落在时间轴内"
+        }
     }
 
-    val totalMinutes: Int get() = endMinute - startMinute
+    private val collapseSpan: Int = collapsed?.let { it.last - it.first } ?: 0
+
+    val totalMinutes: Int get() = endMinute - startMinute - collapseSpan
 
     val height: Dp get() = hourHeight * (totalMinutes / 60f)
 
+    /** 真实分钟 → 虚拟轴分钟：折叠段内的点吸附到折叠起点 */
+    private fun adjusted(minute: Int): Int {
+        val m = minute.coerceIn(startMinute, endMinute)
+        val c = collapsed ?: return m
+        return when {
+            m <= c.first -> m
+            m <= c.last -> c.first
+            else -> m - collapseSpan
+        }
+    }
+
+    /** 虚拟轴分钟 → 真实分钟 */
+    private fun unadjusted(v: Int): Int {
+        val c = collapsed ?: return v
+        return if (v <= c.first) v else v + collapseSpan
+    }
+
     /** 分钟 → 纵向 dp（钳制在时间轴内） */
     fun y(minute: Int): Dp =
-        hourHeight * ((minute.coerceIn(startMinute, endMinute) - startMinute) / 60f)
+        hourHeight * ((adjusted(minute) - startMinute) / 60f)
 
     /** 分钟 → 纵向 px */
     fun yPx(minute: Int, hourHeightPx: Float): Float =
-        hourHeightPx * ((minute.coerceIn(startMinute, endMinute) - startMinute) / 60f)
+        hourHeightPx * ((adjusted(minute) - startMinute) / 60f)
 
     /** 纵向 px → 分钟（钳制在时间轴内） */
     fun minuteAt(yPx: Float, hourHeightPx: Float): Int {
         if (hourHeightPx <= 0f) return startMinute
-        val minute = startMinute + (yPx / hourHeightPx * 60f).roundToInt()
-        return minute.coerceIn(startMinute, endMinute)
+        val v = startMinute + (yPx / hourHeightPx * 60f).roundToInt()
+        return unadjusted(v).coerceIn(startMinute, endMinute)
     }
 
-    /** 整点分割线（含首尾）：08:00、09:00 … 18:00 */
+    /** 整点分割线（含首尾）：08:00、09:00 … 18:00；折叠段内的整点不显示 */
     val hourMarks: List<Int>
-        get() = generateSequence(startMinute) { it + 60 }.takeWhile { it <= endMinute }.toList()
+        get() = generateSequence(startMinute) { it + 60 }
+            .takeWhile { it <= endMinute - collapseSpan }
+            .map { unadjusted(it) }
+            .toList()
 
     companion object {
         /** 半小时（半格）吸附，用于拖动选择 */
