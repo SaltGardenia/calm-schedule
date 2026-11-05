@@ -148,7 +148,8 @@ fun ScheduleScreen(
                 )
                 Text(
                     "第 $week 周 · ${weekLabel(table?.termStartDate, week)}",
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
                     maxLines = 1,
