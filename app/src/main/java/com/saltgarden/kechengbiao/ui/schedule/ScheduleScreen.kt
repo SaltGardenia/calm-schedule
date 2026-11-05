@@ -221,8 +221,6 @@ fun ScheduleScreen(
                 }
             }
 
-            HorizontalLine()
-
             Box(Modifier.weight(1f)) {
                 HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
                     val w = page + 1
@@ -370,16 +368,6 @@ private fun weekLabel(termStart: Long?, week: Int): String {
     if (termStart == null) return ""
     val dates = WeekCalculator.weekDates(termStart, week)
     return "${WeekCalculator.formatDate(dates.first())} - ${WeekCalculator.formatDate(dates.last())}"
-}
-
-@Composable
-private fun HorizontalLine() {
-    Box(
-        Modifier
-            .fillMaxWidth()
-            .height(1.dp)
-            .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-    )
 }
 
 /** 左侧时间栏：整点标签，与右侧整点分割线对齐 */
