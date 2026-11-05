@@ -37,7 +37,7 @@ object SchoolRegistry {
             id = "imu",
             name = "内蒙古大学",
             url = "https://jwxt.imu.edu.cn/login",
-            entrance = "高校教学管理与服务平台（强智）",
+            entrance = "高校教学管理与服务平台（URP）",
             steps = listOf(
                 "登录高校教学管理与服务平台",
                 "打开「学生课表查询」（信息查询菜单）",

@@ -23,6 +23,7 @@ object GenericHtmlParser {
             Candidate("强智教务", "qz") { QzParser.parse(html) },
             Candidate("正方旧版", "zf_old") { ZfOldParser.parse(html) },
             Candidate("金智 EAMS", "eams") { EamsParser.parse(html) },
+            Candidate("URP 平台", "urp") { com.saltgarden.kechengbiao.importer.urp.UrpParser.parse(html) },
             Candidate("通用课程列表", "list") { parseCourseListTable(html) },
             Candidate("通用网格", "grid") { parseGenericGrid(html) },
         )
