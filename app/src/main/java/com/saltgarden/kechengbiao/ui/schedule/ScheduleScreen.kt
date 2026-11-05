@@ -104,8 +104,13 @@ fun ScheduleScreen(
     val week = pagerState.currentPage + 1
     val scope = rememberCoroutineScope()
 
-    val nodeTimes = remember(table?.nodeTimes) {
-        WeekCalculator.parseNodeTimes(table?.nodeTimes ?: WeekCalculator.defaultNodeTimes())
+    // 时间轴显示范围由设置中的"每日节数"决定：
+    // 取前 N 节作息（不足自动补齐），起点向下取整到整点，最晚结束时间向后取整到整点
+    val nodeTimes = remember(table?.nodeTimes, table?.nodeCount) {
+        WeekCalculator.ensureNodeTimes(
+            table?.nodeTimes ?: WeekCalculator.defaultNodeTimes(),
+            table?.nodeCount ?: 12,
+        )
     }
     val timeline = remember(nodeTimes) { Timeline.of(nodeTimes) }
 

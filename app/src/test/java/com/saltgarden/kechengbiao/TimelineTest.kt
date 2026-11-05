@@ -1,6 +1,7 @@
 package com.saltgarden.kechengbiao
 
 import com.saltgarden.kechengbiao.core.time.Timeline
+import com.saltgarden.kechengbiao.core.time.WeekCalculator
 import com.saltgarden.kechengbiao.core.time.nodeEndMinute
 import com.saltgarden.kechengbiao.core.time.nodeStartMinute
 import org.junit.Assert.assertEquals
@@ -51,5 +52,26 @@ class TimelineTest {
         assertEquals(580, nodeEndMinute(2, times))
         // 越界节点用兜底：08:00 + (n-1)*45
         assertEquals(480 + 9 * 45, nodeStartMinute(10, times))
+    }
+
+    @Test
+    fun `时间轴范围随每日节数伸缩`() {
+        // 作息只有 4 节，节数设为 6 时自动补齐两节（上一节结束+10 起、45 分钟/节）
+        val filled = WeekCalculator.ensureNodeTimes(
+            times.joinToString(",") { "${it.first}-${it.second}" }, 6
+        )
+        assertEquals(6, filled.size)
+        // 第 6 节：第 5 节 11:50-12:35，第 6 节 12:45-13:30 → 向后取整到 14:00
+        val t = Timeline.of(filled)
+        assertEquals(13 * 60 + 30, nodeEndMinute(6, filled))
+        assertEquals(14 * 60, t.endMinute)
+        assertEquals(8 * 60, t.startMinute)
+
+        // 节数缩回 3：总长随之缩短（10:45 结束 → 11:00）
+        val shrunk = WeekCalculator.ensureNodeTimes(
+            times.joinToString(",") { "${it.first}-${it.second}" }, 3
+        )
+        assertEquals(3, shrunk.size)
+        assertEquals(11 * 60, Timeline.of(shrunk).endMinute)
     }
 }
