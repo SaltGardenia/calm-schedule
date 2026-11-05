@@ -33,6 +33,18 @@ object SchoolRegistry {
                 "点击底部「抓取本页课表」完成导入",
             ),
         ),
+        School(
+            id = "imu",
+            name = "内蒙古大学",
+            url = "https://jwxt.imu.edu.cn/login",
+            entrance = "高校教学管理与服务平台（强智）",
+            steps = listOf(
+                "登录高校教学管理与服务平台",
+                "打开「学生课表查询」（信息查询菜单）",
+                "确认显示本学期课表",
+                "点击底部「抓取本页课表」完成导入",
+            ),
+        ),
     )
 
     fun byId(id: String): School? = schools.firstOrNull { it.id == id }
