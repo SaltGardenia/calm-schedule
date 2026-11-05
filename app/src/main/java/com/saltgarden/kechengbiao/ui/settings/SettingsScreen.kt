@@ -182,6 +182,45 @@ fun SettingsScreen(vm: SettingsViewModel, onBack: () -> Unit, onGoImport: () -> 
                 OutlinedButton(onClick = { showNodeTimesEditor = true }) { Text("编辑作息") }
             }
 
+            // 检查更新（GitHub Releases）
+            val updateState by vm.update.collectAsState()
+            GlassSection {
+                SectionTitle("检查更新")
+                Text(
+                    "从 GitHub Releases 获取最新安装包；更新仅替换应用本体，课表数据与自动备份不受影响，升级后无需重新导入。",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(8.dp))
+                if (updateState.readyToInstall) {
+                    Button(onClick = vm::installUpdate, modifier = Modifier.fillMaxWidth()) {
+                        Text("安装新版本")
+                    }
+                } else {
+                    Button(
+                        onClick = if (updateState.downloadProgress >= 0) vm::downloadUpdate else vm::checkUpdate,
+                        enabled = !updateState.checking && updateState.downloadProgress < 0,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            when {
+                                updateState.checking -> "检查中…"
+                                updateState.downloadProgress >= 0 -> "下载中 ${updateState.downloadProgress}%"
+                                else -> "检查更新"
+                            }
+                        )
+                    }
+                }
+                if (updateState.message.isNotEmpty()) {
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        updateState.message,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
             Spacer(Modifier.height(24.dp))
         }
     }

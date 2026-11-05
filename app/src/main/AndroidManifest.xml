@@ -4,6 +4,9 @@
     <!-- 教务系统导入需要联网；部分高校教务仍为 http，故允许明文流量 -->
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- 应用内检查更新：下载 APK 后拉起系统安装器 -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
     <application
         android:name=".KcbApplication"
         android:allowBackup="true"
@@ -29,5 +32,16 @@
             android:name=".importer.webview.WebViewGrabActivity"
             android:exported="false"
             android:configChanges="orientation|screenSize|keyboardHidden" />
+
+        <!-- 检查更新：向系统安装器共享下载的 APK -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
     </application>
 </manifest>

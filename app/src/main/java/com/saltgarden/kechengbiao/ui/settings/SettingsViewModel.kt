@@ -9,10 +9,13 @@ import com.saltgarden.kechengbiao.core.time.WeekCalculator
 import com.saltgarden.kechengbiao.data.CourseEntity
 import com.saltgarden.kechengbiao.data.TableEntity
 import com.saltgarden.kechengbiao.importer.text.JsonIO
+import com.saltgarden.kechengbiao.update.AppUpdater
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.flow.filterNotNull
@@ -91,7 +94,12 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     fun setTermStart(date: LocalDate) = updateTable {
         it.copy(termStartDate = date.atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli())
     }
-    fun setNodeCount(n: Int) = updateTable { it.copy(nodeCount = n.coerceIn(6, 16)) }
+    /** 调整每日节数：不可低于本课表最晚的课程结束节次（导入按实际情况初始化，后续可调大） */
+    fun setNodeCount(n: Int) = updateTable { t ->
+        val floor = courses.value.maxOfOrNull { it.endNode } ?: 6
+        val lower = maxOf(floor, 6)
+        t.copy(nodeCount = n.coerceIn(lower, maxOf(lower, 16)))
+    }
     fun setMaxWeek(n: Int) = updateTable { it.copy(maxWeek = n.coerceIn(10, 40)) }
     fun setShowWeekend(v: Boolean) = updateTable { it.copy(showWeekend = v) }
     fun setShowOtherWeek(v: Boolean) = updateTable { it.copy(showOtherWeek = v) }
@@ -119,6 +127,69 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     fun termStartDate(): LocalDate? = table.value?.let {
         java.time.Instant.ofEpochMilli(it.termStartDate)
             .atZone(java.time.ZoneId.systemDefault()).toLocalDate()
+    }
+
+    // ---- 检查更新（GitHub Releases）----
+
+    data class UpdateUiState(
+        val checking: Boolean = false,
+        val message: String = "",
+        /** -1 = 未在下载；0-100 = 下载进度 */
+        val downloadProgress: Int = -1,
+        val readyToInstall: Boolean = false,
+    )
+
+    private val _update = MutableStateFlow(UpdateUiState())
+    val update: StateFlow<UpdateUiState> = _update.asStateFlow()
+
+    private var pendingApk: java.io.File? = null
+
+    fun checkUpdate() {
+        if (_update.value.checking) return
+        _update.value = UpdateUiState(checking = true, message = "正在检查更新…")
+        viewModelScope.launch(Dispatchers.IO) {
+            val context = getApplication<Application>()
+            val release = AppUpdater.checkLatest()
+            when {
+                release == null -> _update.value =
+                    UpdateUiState(message = "检查失败：无法连接 GitHub，请稍后重试")
+                !AppUpdater.isNewer(release.version, AppUpdater.currentVersion(context)) ->
+                    _update.value = UpdateUiState(message = "已是最新版本 v${AppUpdater.currentVersion(context)}")
+                else -> _update.value = UpdateUiState(
+                    message = "发现新版本 v${release.version}，点击「下载并安装」获取",
+                )
+            }
+        }
+    }
+
+    fun downloadUpdate() {
+        if (_update.value.downloadProgress >= 0) return
+        viewModelScope.launch(Dispatchers.IO) {
+            val context = getApplication<Application>()
+            val release = AppUpdater.checkLatest() ?: run {
+                _update.value = UpdateUiState(message = "下载失败：无法连接 GitHub")
+                return@launch
+            }
+            _update.value = UpdateUiState(downloadProgress = 0, message = "下载中…")
+            runCatching {
+                AppUpdater.downloadApk(context, release.apkUrl) { pct ->
+                    _update.value = _update.value.copy(downloadProgress = pct)
+                }
+            }.onSuccess { apk ->
+                pendingApk = apk
+                _update.value = UpdateUiState(
+                    message = "下载完成，点击「安装」完成更新（课表数据不受影响）",
+                    readyToInstall = true,
+                )
+            }.onFailure { e ->
+                _update.value = UpdateUiState(message = "下载失败：${e.message ?: "未知错误"}")
+            }
+        }
+    }
+
+    fun installUpdate() {
+        val apk = pendingApk ?: return
+        AppUpdater.install(getApplication(), apk)
     }
 
     companion object {
