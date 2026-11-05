@@ -66,6 +66,10 @@ fun SettingsScreen(vm: SettingsViewModel, onBack: () -> Unit, onGoImport: () -> 
     var showDatePicker by remember { mutableStateOf(false) }
     var showNodeTimesEditor by remember { mutableStateOf(false) }
     var showTablePicker by remember { mutableStateOf(false) }
+    var showRangeEditor by remember { mutableStateOf(false) }
+
+    val timelineStart by vm.timelineStart.collectAsState()
+    val timelineEnd by vm.timelineEnd.collectAsState()
 
     Scaffold(
         containerColor = Color.Transparent,
@@ -150,6 +154,13 @@ fun SettingsScreen(vm: SettingsViewModel, onBack: () -> Unit, onGoImport: () -> 
                 SectionTitle("显示")
                 SwitchRow("显示周六周日", table?.showWeekend ?: true) { vm.setShowWeekend(it) }
                 SwitchRow("显示非本周课程", table?.showOtherWeek ?: false) { vm.setShowOtherWeek(it) }
+                Spacer(Modifier.height(6.dp))
+                OutlinedButton(
+                    onClick = { showRangeEditor = true },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("时间轴显示范围：${rangeLabel(timelineStart, timelineEnd)}")
+                }
             }
 
             // 作息时间
@@ -212,6 +223,18 @@ fun SettingsScreen(vm: SettingsViewModel, onBack: () -> Unit, onGoImport: () -> 
             onConfirm = { csv ->
                 vm.setNodeTimes(csv)
                 showNodeTimesEditor = false
+            },
+        )
+    }
+
+    if (showRangeEditor) {
+        TimelineRangeEditorDialog(
+            initialStart = timelineStart,
+            initialEnd = timelineEnd,
+            onDismiss = { showRangeEditor = false },
+            onConfirm = { s, e ->
+                vm.setTimelineRange(s, e)
+                showRangeEditor = false
             },
         )
     }
@@ -306,6 +329,72 @@ private fun StepperRow(label: String, value: Int, onMinus: () -> Unit, onPlus: (
 private fun termText(vm: SettingsViewModel): String {
     val d = vm.termStartDate() ?: return "未设置"
     return d.toString()
+}
+
+/** 时间轴范围按钮文案：自定义有效时显示范围，否则显示"自动" */
+private fun rangeLabel(start: String, end: String): String {
+    val s = EventTime.parseMinutes(start)
+    val e = EventTime.parseMinutes(end)
+    return if (s != null && e != null && e > s) "${start} - ${end}（自定义）" else "自动（按节数与作息）"
+}
+
+/** 时间轴显示范围自定义：留空 = 按节数与作息自动计算 */
+@Composable
+private fun TimelineRangeEditorDialog(
+    initialStart: String,
+    initialEnd: String,
+    onDismiss: () -> Unit,
+    onConfirm: (start: String, end: String) -> Unit,
+) {
+    var startText by remember { mutableStateOf(initialStart) }
+    var endText by remember { mutableStateOf(initialEnd) }
+    val s = EventTime.parseMinutes(startText)
+    val e = EventTime.parseMinutes(endText)
+    // 两端都留空 = 恢复自动；填写时必须成对有效且结束晚于开始
+    val valid = (startText.isBlank() && endText.isBlank()) ||
+        (s != null && e != null && e > s)
+
+    GlassDialog(onDismissRequest = onDismiss) {
+        Text("时间轴显示范围", style = MaterialTheme.typography.titleLarge)
+        Text(
+            "留空表示按每日节数与作息自动计算；自定义时请输入 24 小时制 HH:mm",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            OutlinedTextField(
+                value = startText,
+                onValueChange = { startText = filterTimeText(it) },
+                singleLine = true,
+                placeholder = { Text("08:00") },
+                modifier = Modifier.weight(1f)
+            )
+            Text("–", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            OutlinedTextField(
+                value = endText,
+                onValueChange = { endText = filterTimeText(it) },
+                singleLine = true,
+                placeholder = { Text("21:00") },
+                modifier = Modifier.weight(1f)
+            )
+        }
+        Row(
+            Modifier.fillMaxWidth().padding(top = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            GlassDialogButton("取消", onClick = onDismiss)
+            GlassDialogButton(
+                "保存",
+                enabled = valid,
+                primary = true,
+                onClick = { onConfirm(startText.trim(), endText.trim()) }
+            )
+        }
+    }
 }
 
 /** 作息编辑：按已选节数逐节设置起止时间（不再粘贴 CSV） */

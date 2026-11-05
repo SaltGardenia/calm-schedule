@@ -105,14 +105,22 @@ fun ScheduleScreen(
     val scope = rememberCoroutineScope()
 
     // 时间轴显示范围由设置中的"每日节数"决定：
-    // 取前 N 节作息（不足自动补齐），起点向下取整到整点，最晚结束时间向后取整到整点
+    // 取前 N 节作息（不足自动补齐），起点向下取整到整点，最晚结束时间向后取整到整点；
+    // 若在设置中自定义了显示范围（开始/结束均有效且结束晚于开始），则优先使用自定义值
     val nodeTimes = remember(table?.nodeTimes, table?.nodeCount) {
         WeekCalculator.ensureNodeTimes(
             table?.nodeTimes ?: WeekCalculator.defaultNodeTimes(),
             table?.nodeCount ?: 12,
         )
     }
-    val timeline = remember(nodeTimes) { Timeline.of(nodeTimes) }
+    val rangeOverride by vm.timelineRange.collectAsStateWithLifecycle()
+    val timeline = remember(nodeTimes, rangeOverride) {
+        val (startText, endText) = rangeOverride
+        val start = EventTime.parseMinutes(startText)
+        val end = EventTime.parseMinutes(endText)
+        if (start != null && end != null && end > start) Timeline(start, end)
+        else Timeline.of(nodeTimes)
+    }
 
     // todayWeek 是异步加载的 StateFlow（初值 1）：课表就绪后一次性跳到"本周"。
     var jumpedToToday by rememberSaveable(table?.id) { mutableStateOf(false) }
@@ -598,16 +606,19 @@ private fun BoxScope.CourseCard(
                 fontWeight = FontWeight.Medium
             )
             if (course.room.isNotBlank()) {
+                // 字段间的间隔用 Spacer 控制；地点自身换行保持紧凑行距
+                Spacer(Modifier.height(2.dp))
                 Text(
                     "@${course.room}",
                     fontSize = 9.sp,
+                    lineHeight = 11.sp,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                     color = palette.content.copy(alpha = 0.8f)
                 )
             }
             if (dimmed) {
-                Text("(非本周)", fontSize = 8.sp, color = palette.content.copy(alpha = 0.7f))
+                Text("(非本周)", fontSize = 8.sp, lineHeight = 10.sp, color = palette.content.copy(alpha = 0.7f))
             }
         }
     }
@@ -678,9 +689,11 @@ private fun BoxScope.EventCard(
                 modifier = Modifier.padding(start = 14.dp)
             )
             if (event.location.isNotBlank()) {
+                Spacer(Modifier.height(2.dp))
                 Text(
                     "@${event.location}",
                     fontSize = 9.sp,
+                    lineHeight = 11.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     color = primary.copy(alpha = 0.8f),

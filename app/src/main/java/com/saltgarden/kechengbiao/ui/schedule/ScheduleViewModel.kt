@@ -47,6 +47,11 @@ class ScheduleViewModel(app: Application) : AndroidViewModel(app) {
         .map { t -> t?.let { WeekCalculator.currentWeek(it.termStartDate) } ?: 1 }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 1)
 
+    /** 时间轴自定义显示范围（"HH:mm"，空串=按作息与节数自动计算） */
+    val timelineRange: StateFlow<Pair<String, String>> =
+        combine(container.settings.timelineStart, container.settings.timelineEnd) { s, e -> s to e }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "" to "")
+
     /** 全部一次性日程（按日期存储，界面按当前页日期过滤展示） */
     val events: StateFlow<List<EventEntity>> = repo.observeEvents()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())

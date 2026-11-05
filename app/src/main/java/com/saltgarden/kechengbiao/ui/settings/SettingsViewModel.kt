@@ -36,6 +36,16 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
             list.firstOrNull { it.id == activeId } ?: list.firstOrNull()
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
+    /** 时间轴自定义显示范围（"HH:mm"，空串=自动） */
+    val timelineStart: StateFlow<String> = container.settings.timelineStart
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "")
+    val timelineEnd: StateFlow<String> = container.settings.timelineEnd
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "")
+
+    fun setTimelineRange(start: String, end: String) = viewModelScope.launch {
+        container.settings.setTimelineRange(start, end)
+    }
+
     @OptIn(ExperimentalCoroutinesApi::class)
     val courses: StateFlow<List<CourseEntity>> = table
         .filterNotNull()
