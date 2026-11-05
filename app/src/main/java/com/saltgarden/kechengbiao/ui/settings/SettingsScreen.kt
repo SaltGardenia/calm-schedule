@@ -75,7 +75,7 @@ fun SettingsScreen(vm: SettingsViewModel, onBack: () -> Unit, onGoImport: () -> 
 
     val timelineStart by vm.timelineStart.collectAsState()
     val timelineEnd by vm.timelineEnd.collectAsState()
-    val hideLunchBreak by vm.hideLunchBreak.collectAsState()
+    val showLunchBreak by vm.showLunchBreak.collectAsState()
 
     Scaffold(
         containerColor = Color.Transparent,
@@ -160,7 +160,7 @@ fun SettingsScreen(vm: SettingsViewModel, onBack: () -> Unit, onGoImport: () -> 
                 SectionTitle("显示")
                 SwitchRow("显示周六周日", table?.showWeekend ?: true) { vm.setShowWeekend(it) }
                 SwitchRow("显示非本周课程", table?.showOtherWeek ?: false) { vm.setShowOtherWeek(it) }
-                SwitchRow("显示午休时段（12点-14点）", hideLunchBreak) { vm.setHideLunchBreak(it) }
+                SwitchRow("显示午休时段（12点-14点）", showLunchBreak) { vm.setShowLunchBreak(it) }
                 Spacer(Modifier.height(6.dp))
                 OutlinedButton(
                     onClick = { showRangeEditor = true },

@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -42,17 +43,16 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     val timelineEnd: StateFlow<String> = container.settings.timelineEnd
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "")
 
-    /** 折叠午休时段（12:00-14:00） */
-    val hideLunchBreak: StateFlow<Boolean> = container.settings.hideLunchBreak
+    /** 是否显示午休时段（12:00-14:00）；关闭时时间轴折叠该时段。按课表独立设置 */
+    val showLunchBreak: StateFlow<Boolean> = table
+        .map { t -> t?.showLunchBreak ?: false }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
     fun setTimelineRange(start: String, end: String) = viewModelScope.launch {
         container.settings.setTimelineRange(start, end)
     }
 
-    fun setHideLunchBreak(v: Boolean) = viewModelScope.launch {
-        container.settings.setHideLunchBreak(v)
-    }
+    fun setShowLunchBreak(v: Boolean) = updateTable { it.copy(showLunchBreak = v) }
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val courses: StateFlow<List<CourseEntity>> = table

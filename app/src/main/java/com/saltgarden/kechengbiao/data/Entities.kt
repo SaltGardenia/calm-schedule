@@ -25,6 +25,8 @@ data class TableEntity(
     val showWeekend: Boolean = true,
     /** 是否显示非本周课程（默认关闭：只看当前周的课） */
     val showOtherWeek: Boolean = false,
+    /** 是否显示午休时段（12:00-14:00），默认折叠 */
+    val showLunchBreak: Boolean = false,
 )
 
 /** 一门课程的一次/一段固定上课安排 */

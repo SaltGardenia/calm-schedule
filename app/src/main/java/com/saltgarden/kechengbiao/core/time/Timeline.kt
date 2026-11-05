@@ -14,8 +14,10 @@ data class Timeline(
     val startMinute: Int,
     val endMinute: Int,
     val hourHeight: Dp = 62.dp,
-    /** 折叠时段（如 720..840 表示 12:00-14:00 午休从时间轴中压缩掉）；null = 不折叠 */
+    /** 折叠时段（如 720..840 表示 12:00-14:00 午休压缩成一个窄条）；null = 不折叠 */
     val collapsed: IntRange? = null,
+    /** 折叠窄条的高度 */
+    val collapseHeight: Dp = 32.dp,
 ) {
     init {
         require(endMinute > startMinute) { "时间轴范围非法" }
@@ -26,48 +28,66 @@ data class Timeline(
 
     private val collapseSpan: Int = collapsed?.let { it.last - it.first } ?: 0
 
+    /** 折叠段之外的分钟数（线性段总长） */
     val totalMinutes: Int get() = endMinute - startMinute - collapseSpan
 
-    val height: Dp get() = hourHeight * (totalMinutes / 60f)
+    val height: Dp
+        get() = hourHeight * (totalMinutes / 60f) + if (collapsed != null) collapseHeight else 0.dp
 
-    /** 真实分钟 → 虚拟轴分钟：折叠段内的点吸附到折叠起点 */
-    private fun adjusted(minute: Int): Int {
+    /** 折叠段之前的线性段高度 */
+    private fun preHeight(hourHeight: Dp): Dp =
+        collapsed?.let { hourHeight * ((it.first - startMinute) / 60f) } ?: 0.dp
+
+    /** 分钟 → 纵向 dp：折叠段外线性映射，段内在窄条中按比例插值 */
+    fun y(minute: Int): Dp {
+        val c = collapsed ?: return hourHeight * ((minute.coerceIn(startMinute, endMinute) - startMinute) / 60f)
         val m = minute.coerceIn(startMinute, endMinute)
-        val c = collapsed ?: return m
         return when {
-            m <= c.first -> m
-            m <= c.last -> c.first
-            else -> m - collapseSpan
+            m <= c.first -> hourHeight * ((m - startMinute) / 60f)
+            m <= c.last -> preHeight(hourHeight) + collapseHeight * ((m - c.first).toFloat() / collapseSpan)
+            else -> preHeight(hourHeight) + collapseHeight + hourHeight * ((m - c.last) / 60f)
         }
     }
 
-    /** 虚拟轴分钟 → 真实分钟 */
-    private fun unadjusted(v: Int): Int {
-        val c = collapsed ?: return v
-        return if (v <= c.first) v else v + collapseSpan
-    }
-
-    /** 分钟 → 纵向 dp（钳制在时间轴内） */
-    fun y(minute: Int): Dp =
-        hourHeight * ((adjusted(minute) - startMinute) / 60f)
-
     /** 分钟 → 纵向 px */
-    fun yPx(minute: Int, hourHeightPx: Float): Float =
-        hourHeightPx * ((adjusted(minute) - startMinute) / 60f)
+    fun yPx(minute: Int, hourHeightPx: Float): Float {
+        if (collapsed == null) return hourHeightPx * ((minute.coerceIn(startMinute, endMinute) - startMinute) / 60f)
+        return y(minute).value * (hourHeightPx / hourHeight.value)
+    }
 
     /** 纵向 px → 分钟（钳制在时间轴内） */
     fun minuteAt(yPx: Float, hourHeightPx: Float): Int {
         if (hourHeightPx <= 0f) return startMinute
-        val v = startMinute + (yPx / hourHeightPx * 60f).roundToInt()
-        return unadjusted(v).coerceIn(startMinute, endMinute)
+        val c = collapsed
+        if (c == null) {
+            val minute = startMinute + (yPx / hourHeightPx * 60f).roundToInt()
+            return minute.coerceIn(startMinute, endMinute)
+        }
+        val scale = hourHeightPx / hourHeight.value
+        val prePx = preHeight(hourHeight).value * scale
+        val bandPx = collapseHeight.value * scale
+        val m = when {
+            yPx < prePx -> startMinute + (yPx / hourHeightPx * 60f).roundToInt()
+            yPx < prePx + bandPx ->
+                c.first + ((yPx - prePx) / bandPx * collapseSpan).roundToInt()
+            else -> c.last + ((yPx - prePx - bandPx) / hourHeightPx * 60f).roundToInt()
+        }
+        return m.coerceIn(startMinute, endMinute)
     }
 
-    /** 整点分割线（含首尾）：08:00、09:00 … 18:00；折叠段内的整点不显示 */
+    /** 整点分割线（含首尾）：折叠段只保留两端整点（如 12:00、14:00），中间整点（13:00）不显示 */
     val hourMarks: List<Int>
-        get() = generateSequence(startMinute) { it + 60 }
-            .takeWhile { it <= endMinute - collapseSpan }
-            .map { unadjusted(it) }
-            .toList()
+        get() {
+            val c = collapsed
+            return generateSequence(startMinute) { it + 60 }
+                .takeWhile { it <= endMinute }
+                .filter { c == null || it <= c.first || it >= c.last }
+                .toList()
+        }
+
+    /** 折叠段中点的真实分钟（用于绘制 ⋯ 指示），未折叠返回 null */
+    val collapseMidMinute: Int?
+        get() = collapsed?.let { (it.first + it.last) / 2 }
 
     companion object {
         /** 半小时（半格）吸附，用于拖动选择 */

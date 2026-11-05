@@ -7,7 +7,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
     entities = [TableEntity::class, CourseEntity::class, EventEntity::class],
-    version = 5,
+    version = 6,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -67,6 +67,13 @@ abstract class AppDatabase : RoomDatabase() {
                     "UPDATE `events` SET `tableId` = " +
                         "COALESCE((SELECT MIN(id) FROM timetables), 0) WHERE `tableId` = 0"
                 )
+            }
+        }
+
+        /** v5 → v6：午休显示改为每张课表独立设置 */
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `timetables` ADD COLUMN `showLunchBreak` INTEGER NOT NULL DEFAULT 0")
             }
         }
     }

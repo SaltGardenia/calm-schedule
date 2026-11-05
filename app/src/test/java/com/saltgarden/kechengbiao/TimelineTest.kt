@@ -79,18 +79,24 @@ class TimelineTest {
     fun `折叠午休时段`() {
         val base = Timeline(8 * 60, 18 * 60)
         val t = base.copy(collapsed = 12 * 60..14 * 60)
-        // 总高度少 2 小时（10 小时 - 2 小时折叠）
+        // 折叠段外的线性分钟 = 10 小时 - 2 小时
         assertEquals(8 * 60, t.totalMinutes)
-        // 12:00 与 14:00 渲染在同一位置；13:00 也吸附到折叠点
-        assertEquals(t.y(12 * 60), t.y(14 * 60))
-        assertEquals(t.y(12 * 60), t.y(13 * 60))
-        // 15:00 紧跟折叠点之后（虚拟轴 13:00 处）
-        assertEquals(t.y(12 * 60) + t.hourHeight, t.y(15 * 60))
+        // 总高度 = 8 小时线性 + 32dp 折叠窄条
+        assertEquals(62f * 8f + 32f, t.height.value, 0.01f)
+        // 13:00 落在窄条中点
+        assertEquals(
+            t.y(12 * 60).value + 16f, t.y(13 * 60).value, 0.01f
+        )
+        // 14:00 在窄条下边缘
+        assertEquals(t.y(12 * 60).value + 32f, t.y(14 * 60).value, 0.01f)
+        // 15:00 紧跟窄条之后一个整小时
+        assertEquals(t.y(14 * 60).value + 62f, t.y(15 * 60).value, 0.01f)
         // 11:00 不受影响（08:00 起 3 小时 = 186dp）
         assertEquals(186f, t.y(11 * 60).value, 0.01f)
-        // 整点分割线跳过 13:00
-        assertEquals(listOf(480, 540, 600, 660, 720, 900, 960, 1020, 1080), t.hourMarks)
-        // minuteAt 反算：折叠点后一小时对应 15:00
+        // 整点分割线保留 12:00 / 14:00，跳过 13:00
+        assertEquals(listOf(480, 540, 600, 660, 720, 840, 900, 960, 1020, 1080), t.hourMarks)
+        // minuteAt 反算：窄条中点 → 13:00；窄条后一小时 → 15:00
+        assertEquals(13 * 60, t.minuteAt(t.yPx(13 * 60, 100f), 100f))
         assertEquals(15 * 60, t.minuteAt(t.yPx(15 * 60, 100f), 100f))
     }
 }

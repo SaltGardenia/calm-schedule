@@ -54,6 +54,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
@@ -114,16 +115,16 @@ fun ScheduleScreen(
         )
     }
     val rangeOverride by vm.timelineRange.collectAsStateWithLifecycle()
-    val hideLunchBreak by vm.hideLunchBreak.collectAsStateWithLifecycle()
-    val timeline = remember(nodeTimes, rangeOverride, hideLunchBreak) {
+    val showLunchBreak by vm.showLunchBreak.collectAsStateWithLifecycle()
+    val timeline = remember(nodeTimes, rangeOverride, showLunchBreak) {
         val (startText, endText) = rangeOverride
         val start = EventTime.parseMinutes(startText)
         val end = EventTime.parseMinutes(endText)
         val base = if (start != null && end != null && end > start) Timeline(start, end)
         else Timeline.of(nodeTimes)
-        // 折叠午休：仅当时间轴完整覆盖 12:00-14:00 时生效
+        // 「显示午休时段」关闭（默认）时把 12:00-14:00 折叠成窄条；需时间轴完整覆盖该时段
         val lunch = 12 * 60..14 * 60
-        if (hideLunchBreak && base.startMinute <= lunch.first && base.endMinute >= lunch.last + 1) {
+        if (!showLunchBreak && base.startMinute <= lunch.first && base.endMinute >= lunch.last + 1) {
             base.copy(collapsed = lunch)
         } else base
     }
@@ -406,10 +407,9 @@ private fun weekLabel(termStart: Long?, week: Int): String {
     return "${WeekCalculator.formatDate(dates.first())} - ${WeekCalculator.formatDate(dates.last())}"
 }
 
-/** 左侧时间栏：整点标签，与右侧整点分割线对齐 */
+/** 左侧时间栏：整点标签，与右侧整点分割线对齐；折叠段中点显示 ⋯ */
 @Composable
 private fun TimeColumn(timeline: Timeline) {
-    val density = LocalDensity.current
     Box(Modifier.width(TIME_COL_WIDTH).height(timeline.height)) {
         timeline.hourMarks.forEach { minute ->
             val y = timeline.y(minute)
@@ -419,6 +419,17 @@ private fun TimeColumn(timeline: Timeline) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier
                     .offset(y = y - 6.dp)
+                    .padding(start = 2.dp)
+            )
+        }
+        timeline.collapseMidMinute?.let { mid ->
+            Text(
+                "⋯",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .offset(y = timeline.y(mid) - 9.dp)
                     .padding(start = 2.dp)
             )
         }
@@ -512,6 +523,28 @@ private fun RowScope.DayColumn(
                     .offset(y = timeline.y(minute))
                     .height(0.5.dp)
                     .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
+            )
+        }
+
+        // 折叠段中点：虚线分隔（与时间列的 ⋯ 对应）
+        timeline.collapseMidMinute?.let { mid ->
+            val lineColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .offset(y = timeline.y(mid))
+                    .height(1.dp)
+                    .drawBehind {
+                        drawLine(
+                            color = lineColor,
+                            start = Offset(0f, 0f),
+                            end = Offset(size.width, 0f),
+                            strokeWidth = 1.dp.toPx(),
+                            pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(
+                                floatArrayOf(8f, 8f)
+                            ),
+                        )
+                    }
             )
         }
 
