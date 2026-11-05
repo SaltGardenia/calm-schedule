@@ -13,6 +13,8 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
@@ -258,13 +260,15 @@ fun ScheduleScreen(
                 }
             }
 
-            Box(Modifier.weight(1f)) {
+            BoxWithConstraints(Modifier.weight(1f)) {
+                val areaHeight = maxHeight
                 // 纵向滚动提到 Pager 外层共享：斜向滑动时横向翻页更容易接管，
-                // 且省去每页独立的滚动状态与重复过滤
+                // 且省去每页独立的滚动状态与重复过滤；
+                // Pager 高度至少占满视口——时间轴下方的空白区域同样可以左右滑动翻页
                 Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
                     HorizontalPager(
                         state = pagerState,
-                        modifier = Modifier.fillMaxWidth().height(timeline.height),
+                        modifier = Modifier.fillMaxWidth().heightIn(min = areaHeight),
                     ) { page ->
                         val w = page + 1
                         val pageDates = table?.let { WeekCalculator.weekDates(it.termStartDate, w) }
