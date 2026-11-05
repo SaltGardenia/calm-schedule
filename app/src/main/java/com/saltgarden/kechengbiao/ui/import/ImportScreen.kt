@@ -57,7 +57,7 @@ import com.saltgarden.kechengbiao.ui.theme.pressScale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ImportScreen(vm: ImportViewModel, onBack: () -> Unit) {
+fun ImportScreen(vm: ImportViewModel, onBack: () -> Unit, onImported: () -> Unit = onBack) {
     val state by vm.state.collectAsState()
     val context = LocalContext.current
     var selectedSchool by remember { mutableStateOf<School?>(null) }
@@ -92,7 +92,7 @@ fun ImportScreen(vm: ImportViewModel, onBack: () -> Unit) {
         Box(Modifier.padding(padding).fillMaxSize()) {
             if (state.step == ImportStep.Preview && state.parsed != null) {
                 // 抓取/解析成功：展示识别结果预览（勾选后覆盖或追加导入）
-                PreviewStep(vm, state)
+                PreviewStep(vm, state, onImported)
             } else {
                 Column(
                     Modifier
@@ -212,7 +212,7 @@ private fun SchoolStepsDialog(
 }
 
 @Composable
-private fun PreviewStep(vm: ImportViewModel, state: ImportUiState) {
+private fun PreviewStep(vm: ImportViewModel, state: ImportUiState, onImported: () -> Unit) {
     val parsed = state.parsed ?: return
     Column(Modifier.fillMaxSize().padding(16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -254,10 +254,16 @@ private fun PreviewStep(vm: ImportViewModel, state: ImportUiState) {
         }
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = { vm.confirmImport(false) }, modifier = Modifier.weight(1f)) {
+            OutlinedButton(
+                onClick = { vm.confirmImport(false) { onImported() } },
+                modifier = Modifier.weight(1f)
+            ) {
                 Text("追加导入")
             }
-            Button(onClick = { vm.confirmImport(true) }, modifier = Modifier.weight(1f)) {
+            Button(
+                onClick = { vm.confirmImport(true) { onImported() } },
+                modifier = Modifier.weight(1f)
+            ) {
                 Text("覆盖导入")
             }
         }

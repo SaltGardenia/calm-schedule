@@ -252,8 +252,8 @@ class ImportViewModel(app: Application) : AndroidViewModel(app) {
         it.copy(selected = if (selected) p.courses.indices.toSet() else emptySet())
     }
 
-    /** 确认导入（replace=true 覆盖当前课表） */
-    fun confirmImport(replace: Boolean) = viewModelScope.launch(Dispatchers.IO) {
+    /** 确认导入（replace=true 覆盖当前课表）；成功后回调 onImported（失败停在原地显示错误） */
+    fun confirmImport(replace: Boolean, onImported: (() -> Unit)? = null) = viewModelScope.launch(Dispatchers.IO) {
         val s = _state.value
         val parsed = s.parsed ?: return@launch
         // 直接读 DataStore 首个值：stateIn(WhileSubscribed) 在无人订阅时会一直是初值 0
@@ -318,6 +318,7 @@ class ImportViewModel(app: Application) : AndroidViewModel(app) {
                 _state.update {
                     it.copy(step = ImportStep.Choose, parsed = null, selected = emptySet(), busy = false, error = null)
                 }
+                onImported?.invoke()
             }
         } catch (e: Exception) {
             _state.update { it.copy(busy = false, error = friendly(e, "写入数据库失败")) }

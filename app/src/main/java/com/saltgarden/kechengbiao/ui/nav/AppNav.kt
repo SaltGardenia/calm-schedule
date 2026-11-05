@@ -55,7 +55,9 @@ fun AppNav() {
             composable(Screen.Import.route) {
                 ImportScreen(
                     vm = importVm,
-                    onBack = { navController.popBackStack() }
+                    onBack = { navController.popBackStack() },
+                    // 导入成功直接回到课表页（可能从设置页进入，需跳过中间层）
+                    onImported = { navController.popBackStack(Screen.Schedule.route, false) }
                 )
             }
             composable(Screen.Settings.route) {
