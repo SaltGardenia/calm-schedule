@@ -90,26 +90,31 @@ fun ImportScreen(vm: ImportViewModel, onBack: () -> Unit) {
         }
     ) { padding ->
         Box(Modifier.padding(padding).fillMaxSize()) {
-            Column(
-                Modifier
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Text("选择学校", style = MaterialTheme.typography.titleMedium)
-                Text(
-                    "登录学校教务系统后自动抓取课表，无需手动输入。每所学校单独适配，持续增加中。",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                SchoolRegistry.schools.forEach { school ->
-                    SchoolCard(school = school, onClick = { selectedSchool = school })
+            if (state.step == ImportStep.Preview && state.parsed != null) {
+                // 抓取/解析成功：展示识别结果预览（勾选后覆盖或追加导入）
+                PreviewStep(vm, state)
+            } else {
+                Column(
+                    Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text("选择学校", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "登录学校教务系统后自动抓取课表，无需手动输入。每所学校单独适配，持续增加中。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    SchoolRegistry.schools.forEach { school ->
+                        SchoolCard(school = school, onClick = { selectedSchool = school })
+                    }
+                    state.error?.let {
+                        Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
+                    }
+                    Spacer(Modifier.height(24.dp))
                 }
-                state.error?.let {
-                    Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
-                }
-                Spacer(Modifier.height(24.dp))
             }
             if (state.busy) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
