@@ -177,8 +177,8 @@ fun ScheduleScreen(
             val dates = table?.let { WeekCalculator.weekDates(it.termStartDate, week) }
             val days = if (table?.showWeekend == false) (1..5) else (1..7)
 
-            // 星期表头
-            Row(Modifier.fillMaxWidth().padding(top = 12.dp)) {
+            // 星期表头（与顶栏、下方课程区都留出呼吸间距）
+            Row(Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 10.dp)) {
                 Spacer(Modifier.width(TIME_COL_WIDTH))
                 days.forEach { d ->
                     val date = dates?.getOrNull(d - 1)
