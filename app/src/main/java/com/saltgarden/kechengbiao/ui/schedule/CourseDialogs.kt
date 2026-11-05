@@ -24,7 +24,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import com.saltgarden.kechengbiao.core.time.EventTime
 import com.saltgarden.kechengbiao.core.time.WeekCalculator
+import com.saltgarden.kechengbiao.core.time.nodeEndMinute
+import com.saltgarden.kechengbiao.core.time.nodeStartMinute
 import com.saltgarden.kechengbiao.data.CourseEntity
 import com.saltgarden.kechengbiao.ui.theme.GlassDialog
 import com.saltgarden.kechengbiao.ui.theme.GlassDialogButton
@@ -32,6 +35,7 @@ import com.saltgarden.kechengbiao.ui.theme.GlassDialogButton
 @Composable
 fun CourseDetailDialog(
     course: CourseEntity,
+    nodeTimes: List<Pair<String, String>>,
     onDismiss: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
@@ -56,7 +60,13 @@ fun CourseDetailDialog(
             }
         }
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            InfoRow("时间", "周${course.day} 第${course.startNode}-${course.endNode}节")
+            val startMin = nodeStartMinute(course.startNode, nodeTimes)
+            val endMin = nodeEndMinute(course.endNode, nodeTimes)
+            InfoRow(
+                "时间",
+                "周${course.day} 第${course.startNode}-${course.endNode}节" +
+                    "（${EventTime.format(startMin)} - ${EventTime.format(endMin)}）"
+            )
             InfoRow("周次", "${WeekCalculator.weeksToCsv(weeks)}周")
             if (course.teacher.isNotBlank()) InfoRow("教师", course.teacher)
             if (course.room.isNotBlank()) InfoRow("地点", course.room)

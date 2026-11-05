@@ -309,6 +309,7 @@ fun ScheduleScreen(
     detailCourse?.let { c ->
         CourseDetailDialog(
             course = c,
+            nodeTimes = nodeTimes,
             onDismiss = { detailCourse = null },
             onEdit = { detailCourse = null; editCourse = c },
             onDelete = { vm.deleteCourse(c); detailCourse = null }

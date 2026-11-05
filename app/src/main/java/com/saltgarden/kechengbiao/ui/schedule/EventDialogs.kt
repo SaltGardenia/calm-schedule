@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -21,6 +22,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.saltgarden.kechengbiao.core.time.EventTime
 import com.saltgarden.kechengbiao.data.EventEntity
@@ -39,8 +41,24 @@ fun EventDetailDialog(
     onEdit: () -> Unit,
     onDelete: () -> Unit,
 ) {
+    var confirmDelete by remember { mutableStateOf(false) }
+
     GlassDialog(onDismissRequest = onDismiss) {
-        Text(event.title, style = MaterialTheme.typography.titleLarge)
+        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+            Text(
+                event.title,
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.weight(1f),
+            )
+            // 右上角红色垃圾桶：删除入口，点击后二次确认（与课程详情弹窗保持一致）
+            IconButton(onClick = { confirmDelete = true }) {
+                Icon(
+                    Icons.Filled.Delete,
+                    contentDescription = "删除日程",
+                    tint = Color(0xFFE53935),
+                )
+            }
+        }
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             EventInfoRow("日期", dateLabel)
             EventInfoRow(
@@ -54,8 +72,32 @@ fun EventDetailDialog(
             Modifier.fillMaxWidth().padding(top = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            GlassDialogButton("删除", onClick = onDelete)
+            GlassDialogButton("取消", onClick = onDismiss)
             GlassDialogButton("编辑", onClick = onEdit, primary = true)
+        }
+    }
+
+    if (confirmDelete) {
+        GlassDialog(onDismissRequest = { confirmDelete = false }) {
+            Text("删除日程", style = MaterialTheme.typography.titleLarge)
+            Text(
+                "确定删除「${event.title}」？删除后不可恢复。",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Row(
+                Modifier.fillMaxWidth().padding(top = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                GlassDialogButton("取消", onClick = { confirmDelete = false })
+                GlassDialogButton(
+                    "删除",
+                    destructive = true,
+                    onClick = {
+                        confirmDelete = false
+                        onDelete()
+                    }
+                )
+            }
         }
     }
 }
