@@ -1,9 +1,7 @@
 # 不烧心课程表（calm-schedule）
 
 面向中国高校学生的 Android 课程表应用（Kotlin + Jetpack Compose + Room）。
-本项目为**二次开发版本**：在研究 [WakeUp 课程表（BUPT 分支开源源码）](https://github.com/xianfei/WakeupSchedule_BUPT)
-与 [openschoolcn/zfn_api](https://github.com/openschoolcn/zfn_api) 等已有 GitHub 项目源码的基础上，
-重写为 Compose 架构，并适配全国高校常见教务系统的课表导入。
+从零实现课表展示、教务系统适配与课表导入，逐校单独适配，持续增加支持的学校。
 
 ## 功能
 
@@ -25,9 +23,11 @@
     当前支持：**合肥工业大学**（WebVPN 统一认证，金智 EAMS）、**内蒙古大学**（URP 平台，FullCalendar 周视图）
 - **手动管理**：长按空白格添加课程；点击课程查看详情（右上角红色垃圾桶删除，二次确认）；配色自动分配
 - **一次性日程**：课表空白区块**长按滑动**选择时间段（半小时粒度，弹窗可精确到分钟），
-  填写事件内容/地点/备注；仅在所选的那一天生效，不做周次重复（虚线玻璃卡）
+  填写事件内容/地点/备注；仅归属创建时的课表与所选的那一天，不做周次重复（虚线玻璃卡）
 - **多课表**：多学期/多课表切换、独立开学日期与作息
-- **设置**：开学日期（推算当前周）、每日节数、逐节作息编辑、总周数、显示周末、显示非本周课程
+- **设置**：开学日期（推算当前周）、每日节数、逐节作息编辑、总周数、显示周末、显示非本周课程、
+  午休折叠、时间轴显示范围自定义
+- **检查更新**：从 GitHub Releases 检查 / 下载 / 安装新版本；更新不影响课表数据，无需重新导入
 - **数据安全**：自动备份（应用私有目录，数据变更即落盘、启动自动读取恢复），无用户操作入口；
   覆盖升级/迁移异常后数据可自动找回
 
@@ -71,25 +71,15 @@ app/src/main/java/com/saltgarden/kechengbiao/
 │   └── webview/               #   网页登录抓取 Activity
 └── ui/                        # Compose 界面（schedule/import/settings/theme/nav）
 app/src/test/                  # 解析器单元测试 + 真实结构 HTML/JSON 夹具
-docs/                          # 适配指南、REA 逆向方法论、参考项目研究笔记
+docs/                          # 适配指南、REA 逆向方法论
 ```
 
 ## 使用流程
 
-1. 顶部「⤓ 导入」→ 选择学校（当前支持合肥工业大学）→「开始导入」
-2. 在网页中完成登录（支持统一身份认证 / CAS），进入「我的课表」页面
+1. 设置 → 「导入课表」→ 选择学校 →「开始导入」
+2. 在网页中完成登录（支持统一身份认证 / CAS），进入课表页面
 3. 点击底部「抓取本页课表」→ 预览识别结果，勾选后「覆盖 / 追加导入」
 4. 数据自动备份至应用私有目录，应用升级后自动恢复，无需手动操作
-
-## 参考与研究
-
-- [xianfei/WakeupSchedule_BUPT](https://github.com/xianfei/WakeupSchedule_BUPT) —— WakeUp 课程表 3.621 开源源码，
-  本项目的解析策略（`kbtable`/`Table1` 定位、`title` 属性字段、`-----` 分隔多课等）与 WebView 抓取方案均来源于对它的源码研究，见 [docs/参考项目研究笔记.md](docs/参考项目研究笔记.md)
-- [openschoolcn/zfn_api](https://github.com/openschoolcn/zfn_api) —— 新版正方接口规格（登录 RSA、`xqm=学期²×3` 等）
-- [Chiu-xaH/HFUT-Schedule](https://github.com/Chiu-xaH/HFUT-Schedule) —— 液态玻璃底栏设计参考：
-  悬浮胶囊轨道 + 独立透镜指示器 + 拖动吸附 + haze 渐进模糊；本项目复现并向更不透明、更强模糊方向调整，
-  见 [docs/参考项目研究笔记.md §3](docs/参考项目研究笔记.md)
-- WakeUp 官方文档 —— CSV 导入模板格式
 
 合规说明：本项目仅与用户**本人**的教务账号交互以导入其个人课表，不存储密码、不上传任何数据到任何服务器。
 

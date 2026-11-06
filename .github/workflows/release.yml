@@ -1,11 +1,15 @@
-# 打 tag（如 v1.0.1）自动构建 APK 并发布到 GitHub Releases。
+# 手动触发发版：在 GitHub Actions 页面运行，或在本地执行
+#   gh workflow run release.yml -f version=v1.0.2
+# 构建 APK 并发布到 GitHub Releases（tag 不存在时自动创建）。
 # 应用内「检查更新」读取最新 Release 的 tag 与 APK 资产。
 name: Release
 
 on:
-  push:
-    tags:
-      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '版本号（如 v1.0.2）'
+        required: true
 
 permissions:
   contents: write
@@ -31,10 +35,11 @@ jobs:
       - name: Rename APK
         run: |
           cp app/build/outputs/apk/debug/app-debug.apk \
-             calm-schedule-${{ github.ref_name }}.apk
+             calm-schedule-${{ inputs.version }}.apk
 
       - name: Publish to GitHub Releases
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ inputs.version }}
           files: calm-schedule-*.apk
           generate_release_notes: true
