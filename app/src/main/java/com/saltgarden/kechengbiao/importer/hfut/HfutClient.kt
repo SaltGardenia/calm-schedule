@@ -55,6 +55,7 @@ class HfutClient {
         private const val SERVICE = "http://jxglstu.hfut.edu.cn/eams5-student/neusoft-sso/login"
         private const val UA =
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        private const val WEBVPN_TICKET_COOKIE = "wengine_vpn_ticketwebvpn_hfut_edu_cn"
 
         private val json = Json { ignoreUnknownKeys = true; isLenient = true }
     }
@@ -79,42 +80,81 @@ class HfutClient {
     private val casBase get() = WEBVPN + CAS_PATH
     private val eamsBase get() = WEBVPN + EAMS_PATH + "/eams5-student"
 
-    /** 登录前探测：是否需要验证码；同时拿到 AES 密钥 */
+    /** 登录前探测：是否需要验证码；同时准备好 AES 密钥与 CAS 会话 Cookie */
     data class InitInfo(val needCaptcha: Boolean)
 
-    @Serializable
-    private data class InitParams(val needCaptcha: Boolean = false)
-
-    fun checkInit(): InitInfo {
-        val url = "$casBase/cas/checkInitParams"
-        val req = Request.Builder().url(url).header("User-Agent", UA).build()
-        val body = http.newCall(req).execute().use { resp ->
-            if (!resp.isSuccessful && resp.code !in 200..399) {
-                throw ImportException("无法连接合肥工业大学统一认证（HTTP ${resp.code}）")
+    /** WebVPN 会话 ticket（访问任一 webvpn 页面即下发） */
+    private fun webvpnTicket(): String {
+        if (cookies[WEBVPN_TICKET_COOKIE] == null) {
+            // 首次访问代理的 CAS 接口会建立 WebVPN 会话并下发 ticket
+            runCatching {
+                http.newCall(
+                    Request.Builder().url("$casBase/cas/checkInitParams")
+                        .header("User-Agent", UA).build()
+                ).execute().close()
             }
-            resp.body?.string().orEmpty()
         }
-        val need = runCatching {
-            json.decodeFromString(InitParams.serializer(), body).needCaptcha
-        }.getOrElse { body.contains("\"needCaptcha\":true") }
+        return cookies[WEBVPN_TICKET_COOKIE]?.value
+            ?: throw ImportException("无法连接合肥工业大学 WebVPN，请检查网络")
+    }
+
+    /**
+     * 通过 WebVPN 的 cookie 桥接接口取 CAS 会话 Cookie：
+     *   GET /wengine-vpn/cookie?method=get&host=cas.hfut.edu.cn&scheme=http&path=/cas/login
+     * 返回纯文本 "SESSION=..; LOGIN_FLAVORING=<AES密钥>; JSESSIONID=.."
+     *
+     * 注意：必须先在代理的 CAS 路径上访问过（如 checkInitParams）建立 WebVPN 会话，
+     * 否则接口返回空内容（实测行为）。
+     */
+    private fun casCookies(): String {
+        webvpnTicket()
+        val url = "$WEBVPN/wengine-vpn/cookie?method=get&host=cas.hfut.edu.cn" +
+            "&scheme=http&path=/cas/login"
+        val text = http.newCall(
+            Request.Builder().url(url).header("User-Agent", UA).build()
+        ).execute().use { it.body?.string().orEmpty() }.trim().trimEnd(';')
+        if (!text.contains("LOGIN_FLAVORING")) {
+            throw ImportException("未获取到登录密钥，请稍后重试（WebVPN 会话可能已失效）")
+        }
+        return text
+    }
+
+    private fun aesKey(casCookie: String): String =
+        Regex("""LOGIN_FLAVORING=([^;]+)""").find(casCookie)?.groupValues?.get(1)
+            ?: throw ImportException("未获取到登录密钥，请稍后重试")
+
+    /** 是否需要验证码（该校字段为 vercode，兼容 needCaptcha） */
+    fun checkInit(): InitInfo {
+        val casCookie = casCookies() // 顺带完成密钥与 WebVPN 会话准备
+        val url = "$casBase/cas/checkInitParams"
+        val body = http.newCall(
+            Request.Builder().url(url).header("User-Agent", UA)
+                .header("Cookie", casCookie).build()
+        ).execute().use { it.body?.string().orEmpty() }
+        val need = body.contains("\"vercode\":true") || body.contains("\"needCaptcha\":true")
         return InitInfo(needCaptcha = need)
     }
 
     /** 验证码图片（调用前需已完成 checkInit） */
     fun fetchCaptcha(): Bitmap? {
+        val casCookie = casCookies()
         val url = "$casBase/cas/vercode?timestamp=${System.currentTimeMillis()}"
-        val req = Request.Builder().url(url).header("User-Agent", UA).build()
-        val bytes = http.newCall(req).execute().use { resp ->
+        val bytes = http.newCall(
+            Request.Builder().url(url).header("User-Agent", UA)
+                .header("Cookie", casCookie).build()
+        ).execute().use { resp ->
             if (!resp.isSuccessful) null else resp.body?.bytes()
         } ?: return null
         return runCatching { BitmapFactory.decodeByteArray(bytes, 0, bytes.size) }.getOrNull()
     }
 
     /** 取登录表单 execution 值 */
-    private fun fetchExecution(): String {
+    private fun fetchExecution(casCookie: String): String {
         val url = "$casBase/cas/login?service=${enc(SERVICE)}"
-        val req = Request.Builder().url(url).header("User-Agent", UA).build()
-        val html = http.newCall(req).execute().use { it.body?.string().orEmpty() }
+        val html = http.newCall(
+            Request.Builder().url(url).header("User-Agent", UA)
+                .header("Cookie", casCookie).build()
+        ).execute().use { it.body?.string().orEmpty() }
         val m = Regex("""name=["']execution["'][^>]*value=["']([^"']+)["']""").find(html)
             ?: Regex("""value=["']([^"']+)["'][^>]*name=["']execution["']""").find(html)
         return m?.groupValues?.get(1) ?: "e1s1"
@@ -130,16 +170,16 @@ class HfutClient {
 
     /**
      * 登录并抓取课表。
-     * @param captcha 验证码（needCaptcha=false 时忽略）
+     * @param captcha 验证码（需要时必填）
      */
     fun loginAndFetch(username: String, password: String, captcha: String): ParsedSchedule {
-        // 1) AES 密钥来自 LOGIN_FLAVORING cookie
-        checkInit()
-        val key = cookies["LOGIN_FLAVORING"]?.value
-            ?: throw ImportException("未获取到登录密钥，请稍后重试")
+        // 1) WebVPN ticket + CAS 会话 Cookie + AES 密钥
+        val casCookie = casCookies()
+        val key = aesKey(casCookie)
 
-        // 2) 登录
-        val execution = fetchExecution()
+        // 2) 登录；打开过登录页后桥接 Cookie 会补齐 SESSION，提交时用最新值
+        val execution = fetchExecution(casCookie)
+        val postCookies = runCatching { casCookies() }.getOrDefault(casCookie)
         val form = FormBody.Builder()
             .add("username", username)
             .add("password", encryptPassword(password, key))
@@ -148,23 +188,34 @@ class HfutClient {
             .add("capcha", captcha)
             .build()
         val loginUrl = "$casBase/cas/login?service=${enc(SERVICE)}"
-        http.newCall(
-            Request.Builder().url(loginUrl).header("User-Agent", UA).post(form).build()
+        val (code, location, body) = http.newCall(
+            Request.Builder().url(loginUrl).header("User-Agent", UA)
+                .header("Cookie", postCookies)
+                .post(form).build()
         ).execute().use { resp ->
-            val body = resp.body?.string().orEmpty()
-            if (body.contains("用户名或密码错误") || body.contains("密码错误")) {
+            Triple(
+                resp.code,
+                resp.header("Location").orEmpty(),
+                resp.body?.string().orEmpty(),
+            )
+        }
+        val succeeded = location.contains("ticket=") || (code in 300..399 && location.isNotEmpty())
+        if (!succeeded) {
+            if (body.contains("密码错误") || body.contains("用户名或密码")) {
                 throw ImportException("用户名或密码错误")
             }
-            if (body.contains("验证码") && body.contains("登录")) {
-                // 仍停留在登录页 → 验证码或凭据问题
-                throw ImportException("登录未通过：请检查验证码是否正确")
-            }
+            if (body.contains("验证码")) throw ImportException("验证码不正确，已自动刷新，请重试")
+            throw ImportException("登录未通过，请检查账号密码或改用网页登录")
         }
 
-        // 3) 建立教务会话
+        // 3) 建立教务会话（WebVPN ticket 换取教务访问权）
+        val ticket = webvpnTicket()
         runCatching {
             http.newCall(
-                Request.Builder().url("$eamsBase/neusoft-sso/login").header("User-Agent", UA).build()
+                Request.Builder().url("$eamsBase/neusoft-sso/login")
+                    .header("User-Agent", UA)
+                    .header("Cookie", "$WEBVPN_TICKET_COOKIE=$ticket")
+                    .build()
             ).execute().close()
         }
 
