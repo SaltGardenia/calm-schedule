@@ -266,7 +266,15 @@ class ImportViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private fun hfutClientInstance(): HfutClient =
-        hfutClient ?: HfutClient(::hfutLog).also { hfutClient = it }
+        hfutClient ?: HfutClient(
+            log = ::hfutLog,
+            saveFailure = { body ->
+                runCatching {
+                    getApplication<Application>().openFileOutput("login_fail.html", Application.MODE_PRIVATE)
+                        .use { it.write(body.take(300_000).toByteArray()) }
+                }
+            },
+        ).also { hfutClient = it }
 
     /** 打开原生登录弹窗：探测是否需要验证码，并自动识别验证码 */
     fun openHfutLogin() = viewModelScope.launch(Dispatchers.IO) {

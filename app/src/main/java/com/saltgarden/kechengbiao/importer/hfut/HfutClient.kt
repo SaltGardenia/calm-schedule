@@ -47,6 +47,8 @@ import javax.crypto.spec.SecretKeySpec
 class HfutClient(
     /** 调试日志（脱敏：只记步骤、长度、状态码，绝不记录账号密码） */
     private val log: (String) -> Unit = {},
+    /** 登录失败时保存响应体（用于分析非密码类失败页面） */
+    private val saveFailure: ((String) -> Unit)? = null,
 ) {
 
     companion object {
@@ -240,6 +242,10 @@ class HfutClient(
         log("login result: http=$code location=${location.take(80)} " +
             "hasPwdErr=${body.contains("密码错误")} hasCapErr=${body.contains("验证码")} " +
             "bodyLen=${body.length}")
+        if (!succeeded) {
+            // 保留失败响应体（不含密码），便于排查二次确认/信息采集等非密码类失败
+            runCatching { saveFailure?.invoke(body) }
+        }
         if (!succeeded) {
             if (body.contains("验证码")) {
                 throw ImportException("验证码不正确，已自动刷新，请重试")
