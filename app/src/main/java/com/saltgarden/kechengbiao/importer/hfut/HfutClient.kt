@@ -57,7 +57,7 @@ class HfutClient(
         private const val CAS_PATH = "/http/77726476706e69737468656265737421f3f652d22f367d44300d8db9d6562d"
         /** 教务系统通道 token */
         private const val EAMS_PATH = "/http/77726476706e69737468656265737421faef469034247d1e760e9cb8d6502720ede479"
-        private const val SERVICE = "http://jxglstu.hfut.edu.cn/eams5-student/neusoft-sso/login"
+        private const val SERVICE = "https://webvpn.hfut.edu.cn/login?cas_login=true"
         private const val UA =
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         private const val WEBVPN_TICKET_COOKIE = "wengine_vpn_ticketwebvpn_hfut_edu_cn"
@@ -268,20 +268,30 @@ class HfutClient(
             throw ImportException("登录未通过（HTTP $code），请改用网页登录")
         }
 
-        // 4) 建立教务会话：必须走 CAS 返回的完整跳转地址（带 ticket 参数），
-        //    否则 EAMS 侧不认为已认证
-        val ssoUrl = location.ifBlank { "$eamsBase/neusoft-sso/login" }
-        log("sso: ${ssoUrl.take(120)}")
+        // 4) 完成 WebVPN 主会话：跟随 CAS 302（service=webvpn 登录），
+        //    WebVPN 借此写入已认证 ticket
         runCatching {
             val resp = http.newCall(
-                Request.Builder().url(ssoUrl)
+                Request.Builder().url(location)
                     .header("User-Agent", UA)
                     .header("Cookie", ticketCookie())
                     .build()
             ).execute()
-            log("sso result: http=${resp.code} final=${resp.request.url.toString().take(90)}")
+            log("vpn session: http=${resp.code} final=${resp.request.url.toString().take(90)}")
             resp.close()
-        }.onFailure { log("sso error: ${it.message}") }
+        }.onFailure { log("vpn session error: ${it.message}") }
+
+        // 5) 建立教务会话（WebVPN 已认证后再访问教务 SSO）
+        runCatching {
+            val resp = http.newCall(
+                Request.Builder().url("$eamsBase/neusoft-sso/login")
+                    .header("User-Agent", UA)
+                    .header("Cookie", ticketCookie())
+                    .build()
+            ).execute()
+            log("eams sso: http=${resp.code} final=${resp.request.url.toString().take(90)}")
+            resp.close()
+        }.onFailure { log("eams sso error: ${it.message}") }
 
         // 4) 学生 id
         val tableUrl = "$eamsBase/for-std/course-table"
