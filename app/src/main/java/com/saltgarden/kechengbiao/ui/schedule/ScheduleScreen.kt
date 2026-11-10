@@ -715,24 +715,15 @@ private fun BoxScope.EventCard(
             .padding(5.dp)
     ) {
         Column {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    Icons.Outlined.Event,
-                    contentDescription = null,
-                    tint = primary,
-                    modifier = Modifier.size(11.dp),
-                )
-                Spacer(Modifier.width(3.dp))
-                Text(
-                    event.title,
-                    fontSize = 10.sp,
-                    lineHeight = 12.sp,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    color = primary,
-                    fontWeight = FontWeight.Medium,
-                )
-            }
+            Text(
+                event.title,
+                fontSize = 10.sp,
+                lineHeight = 12.sp,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                color = primary,
+                fontWeight = FontWeight.Medium,
+            )
             Text(
                 "${EventTime.format(event.startMinute)}-${EventTime.format(event.endMinute)}",
                 fontSize = 8.sp,
@@ -740,7 +731,6 @@ private fun BoxScope.EventCard(
                 color = primary.copy(alpha = 0.75f),
                 maxLines = 2,
                 overflow = TextOverflow.Clip,
-                modifier = Modifier.padding(start = 14.dp)
             )
             if (event.location.isNotBlank()) {
                 Spacer(Modifier.height(2.dp))
@@ -751,7 +741,6 @@ private fun BoxScope.EventCard(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     color = primary.copy(alpha = 0.8f),
-                    modifier = Modifier.padding(start = 14.dp)
                 )
             }
         }
