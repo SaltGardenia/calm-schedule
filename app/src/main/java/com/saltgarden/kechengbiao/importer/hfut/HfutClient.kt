@@ -163,10 +163,17 @@ class HfutClient(
         return m?.groupValues?.get(1) ?: "e1s1"
     }
 
-    /** AES/ECB 加密密码（与教务登录页一致） */
+    /** AES/ECB 加密密码（与教务登录页一致；密钥按原字节长度使用 128/192/256 位） */
     private fun encryptPassword(password: String, key: String): String {
+        val raw = key.toByteArray()
+        val keyBytes = when {
+            raw.size == 16 || raw.size == 24 || raw.size == 32 -> raw
+            raw.size > 32 -> raw.copyOf(32)
+            raw.size > 24 -> raw.copyOf(24)
+            raw.size > 16 -> raw.copyOf(16)
+            else -> raw.copyOf(16)
+        }
         val cipher = Cipher.getInstance("AES/ECB/PKCS5Padding")
-        val keyBytes = key.toByteArray().copyOf(16)
         cipher.init(Cipher.ENCRYPT_MODE, SecretKeySpec(keyBytes, "AES"))
         return Base64.encodeToString(cipher.doFinal(password.toByteArray()), Base64.NO_WRAP)
     }
@@ -187,16 +194,37 @@ class HfutClient(
         // WebVPN 会话 ticket 与 CAS Cookie 必须同时携带（显式 Cookie 头会覆盖 jar）
         val cookieHeader = "${WEBVPN_TICKET_COOKIE}=${webvpnTicket()}; $postCookies"
 
+        val encrypted = encryptPassword(password, key)
+        // 3) 与网页登录一致：先做账号密码预检，能拿到服务端准确原因
+        val policyUrl = "$casBase/cas/policy/checkUserIdenty" +
+            "?username=${enc(username)}&password=${enc(encrypted)}" +
+            if (captcha.isNotBlank()) "&capcha=${enc(captcha)}" else ""
+        val policy = http.newCall(
+            Request.Builder().url(policyUrl).header("User-Agent", UA)
+                .header("Cookie", cookieHeader).build()
+        ).execute().use { it.body?.string().orEmpty() }
+        log("policy: len=${policy.length} head=${policy.take(120)}")
+        // {"code":1,...} 表示通过；其余为失败（message 为服务端原因）
+        if (!policy.contains("\"code\":1")) {
+            val msg = Regex(""""msg"\s*:\s*"([^"]*)"""").find(policy)?.groupValues?.get(1)
+                ?: Regex(""""message"\s*:\s*"([^"]*)"""").find(policy)?.groupValues?.get(1)
+            if (!msg.isNullOrBlank()) throw ImportException(msg)
+            if (policy.contains("验证码")) throw ImportException("验证码不正确，已自动刷新，请重试")
+            if (policy.contains("密码")) throw ImportException("密码不正确，请检查后重试")
+        }
+
         val form = FormBody.Builder()
             .add("username", username)
-            .add("password", encryptPassword(password, key))
+            .add("password", encrypted)
             .add("execution", execution)
             .add("_eventId", "submit")
             .add("capcha", captcha)
+            .add("geolocation", "")
+            .add("codeRandom", "")
             .build()
         log("login: execution=$execution keyLen=${key.length} pwdLen=${password.length} " +
             "captchaLen=${captcha.length} cookieLen=${postCookies.length}")
-        val loginUrl = "$casBase/cas/login?service=${enc(SERVICE)}"
+        val loginUrl = "$casBase/cas/login"
         val (code, location, body) = http.newCall(
             Request.Builder().url(loginUrl).header("User-Agent", UA)
                 .header("Cookie", cookieHeader)
