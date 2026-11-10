@@ -82,6 +82,16 @@ class HfutClient(
         .readTimeout(30, TimeUnit.SECONDS)
         .build()
 
+    /**
+     * 登录提交专用：不自动跟随跳转。
+     * CAS 成功时返回 302 + Location(ticket=...)，失败为 401 或 200 登录页；
+     * 若自动跟随，最终会落到 WebVPN 页面，导致成功也被误判为失败。
+     */
+    private val httpNoRedirect = http.newBuilder()
+        .followRedirects(false)
+        .followSslRedirects(false)
+        .build()
+
     private val casBase get() = WEBVPN + CAS_PATH
     private val eamsBase get() = WEBVPN + EAMS_PATH + "/eams5-student"
 
@@ -227,7 +237,7 @@ class HfutClient(
         log("login: execution=$execution keyLen=${key.length} pwdLen=${password.length} " +
             "captchaLen=${captcha.length}")
         val loginUrl = "$casBase/cas/login?service=${enc(SERVICE)}"
-        val (code, location, body) = http.newCall(
+        val (code, location, body) = httpNoRedirect.newCall(
             Request.Builder().url(loginUrl).header("User-Agent", UA)
                 .header("Cookie", ticketCookie())
                 .post(form).build()
