@@ -257,11 +257,22 @@ class ImportViewModel(app: Application) : AndroidViewModel(app) {
 
     private var hfutClient: HfutClient? = null
 
+    /** 脱敏调试日志（步骤/长度/状态码），便于排查登录问题；不记录账号密码 */
+    private fun hfutLog(msg: String) {
+        runCatching {
+            getApplication<Application>().openFileOutput("login_debug.log", Application.MODE_APPEND)
+                .use { it.write("[${System.currentTimeMillis()}] $msg\n".toByteArray()) }
+        }
+    }
+
+    private fun hfutClientInstance(): HfutClient =
+        hfutClient ?: HfutClient(::hfutLog).also { hfutClient = it }
+
     /** 打开原生登录弹窗：探测是否需要验证码，并自动识别验证码 */
     fun openHfutLogin() = viewModelScope.launch(Dispatchers.IO) {
         _state.update { it.copy(hfutLoginVisible = true, hfutBusy = true, hfutError = null) }
         try {
-            val client = hfutClient ?: HfutClient().also { hfutClient = it }
+            val client = hfutClientInstance()
             val init = client.checkInit()
             val bmp = if (init.needCaptcha) client.fetchCaptcha() else null
             val ocr = if (bmp != null) withContext(Dispatchers.Default) {
@@ -285,7 +296,7 @@ class ImportViewModel(app: Application) : AndroidViewModel(app) {
     /** 刷新验证码并重新识别 */
     fun refreshHfutCaptcha() = viewModelScope.launch(Dispatchers.IO) {
         try {
-            val client = hfutClient ?: HfutClient().also { hfutClient = it }
+            val client = hfutClientInstance()
             val bmp = client.fetchCaptcha()
             val ocr = if (bmp != null) withContext(Dispatchers.Default) {
                 CaptchaOcr.recognize(getApplication(), bmp)
@@ -313,7 +324,7 @@ class ImportViewModel(app: Application) : AndroidViewModel(app) {
         }
         _state.update { it.copy(hfutBusy = true, hfutError = null) }
         try {
-            val client = hfutClient ?: HfutClient().also { hfutClient = it }
+            val client = hfutClientInstance()
             val parsed = client.loginAndFetch(user.trim(), password, captcha.trim())
             if (remember) {
                 container.settings.setHfutCredentials(user.trim(), password)

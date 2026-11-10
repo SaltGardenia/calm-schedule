@@ -44,7 +44,10 @@ import javax.crypto.spec.SecretKeySpec
  *  - GET  for-std/course-table/get-data       → lessonIds
  *  - POST ws/schedule-table/datum             → 逐周课表 JSON
  */
-class HfutClient {
+class HfutClient(
+    /** 调试日志（脱敏：只记步骤、长度、状态码，绝不记录账号密码） */
+    private val log: (String) -> Unit = {},
+) {
 
     companion object {
         private const val WEBVPN = "https://webvpn.hfut.edu.cn"
@@ -191,6 +194,8 @@ class HfutClient {
             .add("_eventId", "submit")
             .add("capcha", captcha)
             .build()
+        log("login: execution=$execution keyLen=${key.length} pwdLen=${password.length} " +
+            "captchaLen=${captcha.length} cookieLen=${postCookies.length}")
         val loginUrl = "$casBase/cas/login?service=${enc(SERVICE)}"
         val (code, location, body) = http.newCall(
             Request.Builder().url(loginUrl).header("User-Agent", UA)
@@ -204,6 +209,9 @@ class HfutClient {
             )
         }
         val succeeded = location.contains("ticket=") || (code in 300..399 && location.isNotEmpty())
+        log("login result: http=$code location=${location.take(80)} " +
+            "hasPwdErr=${body.contains("密码错误")} hasCapErr=${body.contains("验证码")} " +
+            "bodyLen=${body.length}")
         if (!succeeded) {
             if (body.contains("验证码")) {
                 throw ImportException("验证码不正确，已自动刷新，请重试")
