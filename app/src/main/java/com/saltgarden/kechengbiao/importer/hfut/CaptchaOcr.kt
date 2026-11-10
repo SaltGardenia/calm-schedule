@@ -18,13 +18,21 @@ object CaptchaOcr {
     @Volatile
     private var ready = false
 
+    /** 模型版本：更换 assets 里的模型时 +1，确保设备上的旧模型被覆盖 */
+    private const val MODEL_VERSION = 2
+    private const val MODEL_ASSET = "tessdata/eng.traineddata"
+
     private fun ensureModel(context: Context): File? = runCatching {
         val dir = File(context.filesDir, "tessdata").apply { mkdirs() }
         val model = File(dir, "eng.traineddata")
-        if (!model.exists() || model.length() < 100_000) {
-            context.assets.open("tessdata/eng.traineddata").use { input ->
+        val versionFile = File(dir, ".model_version")
+        val installed = versionFile.takeIf { it.exists() }?.readText()?.trim()?.toIntOrNull() ?: 0
+        // 版本不一致（含首次安装/模型升级）一律重新复制，避免继续使用旧模型
+        if (installed != MODEL_VERSION || !model.exists()) {
+            context.assets.open(MODEL_ASSET).use { input ->
                 model.outputStream().use { output -> input.copyTo(output) }
             }
+            versionFile.writeText(MODEL_VERSION.toString())
         }
         model
     }.getOrNull()
