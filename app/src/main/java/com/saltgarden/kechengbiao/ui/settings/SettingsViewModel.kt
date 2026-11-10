@@ -137,6 +137,10 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
         /** -1 = 未在下载；0-100 = 下载进度 */
         val downloadProgress: Int = -1,
         val readyToInstall: Boolean = false,
+        /** 发现新版本（按钮应变为「下载并安装」） */
+        val updateAvailable: Boolean = false,
+        /** 已是最新 */
+        val upToDate: Boolean = false,
     )
 
     private val _update = MutableStateFlow(UpdateUiState())
@@ -154,9 +158,13 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
                 release == null -> _update.value =
                     UpdateUiState(message = "检查失败：无法连接 GitHub，请稍后重试")
                 !AppUpdater.isNewer(release.version, AppUpdater.currentVersion(context)) ->
-                    _update.value = UpdateUiState(message = "已是最新版本 v${AppUpdater.currentVersion(context)}")
+                    _update.value = UpdateUiState(
+                        message = "已是最新版本 v${AppUpdater.currentVersion(context)}",
+                        upToDate = true,
+                    )
                 else -> _update.value = UpdateUiState(
-                    message = "发现新版本 v${release.version}，点击「下载并安装」获取",
+                    message = "发现新版本 v${release.version}",
+                    updateAvailable = true,
                 )
             }
         }

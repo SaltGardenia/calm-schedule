@@ -192,24 +192,26 @@ fun SettingsScreen(vm: SettingsViewModel, onBack: () -> Unit, onGoImport: () -> 
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(Modifier.height(8.dp))
-                if (updateState.readyToInstall) {
-                    Button(onClick = vm::installUpdate, modifier = Modifier.fillMaxWidth()) {
-                        Text("安装新版本")
-                    }
-                } else {
-                    Button(
-                        onClick = if (updateState.downloadProgress >= 0) vm::downloadUpdate else vm::checkUpdate,
-                        enabled = !updateState.checking && updateState.downloadProgress < 0,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(
-                            when {
-                                updateState.checking -> "检查中…"
-                                updateState.downloadProgress >= 0 -> "下载中 ${updateState.downloadProgress}%"
-                                else -> "检查更新"
-                            }
-                        )
-                    }
+                Button(
+                    onClick = {
+                        when {
+                            updateState.readyToInstall -> vm.installUpdate()
+                            updateState.updateAvailable -> vm.downloadUpdate()
+                            else -> vm.checkUpdate()
+                        }
+                    },
+                    enabled = !updateState.checking && updateState.downloadProgress < 0,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        when {
+                            updateState.checking -> "检查中…"
+                            updateState.downloadProgress >= 0 -> "下载中 ${updateState.downloadProgress}%"
+                            updateState.readyToInstall -> "安装新版本"
+                            updateState.updateAvailable -> "下载并安装"
+                            else -> "检查更新"
+                        }
+                    )
                 }
                 if (updateState.message.isNotEmpty()) {
                     Spacer(Modifier.height(6.dp))
