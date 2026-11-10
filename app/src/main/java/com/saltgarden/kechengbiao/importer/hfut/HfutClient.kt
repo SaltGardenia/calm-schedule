@@ -124,6 +124,9 @@ class HfutClient(
         return text
     }
 
+    /** 取当前最新 ticket 的 Cookie 头（WebVPN 每次响应都会轮换 ticket） */
+    private fun ticketCookie(): String = "$WEBVPN_TICKET_COOKIE=${webvpnTicket()}"
+
     private fun aesKey(casCookie: String): String =
         Regex("""LOGIN_FLAVORING=([^;]+)""").find(casCookie)?.groupValues?.get(1)
             ?: throw ImportException("未获取到登录密钥，请稍后重试")
@@ -142,11 +145,10 @@ class HfutClient(
 
     /** 验证码图片：只带 WebVPN ticket，与登录提交保持同一会话 */
     fun fetchCaptcha(): Bitmap? {
-        val ticket = webvpnTicket()
         val url = "$casBase/cas/vercode?timestamp=${System.currentTimeMillis()}"
         val bytes = http.newCall(
             Request.Builder().url(url).header("User-Agent", UA)
-                .header("Cookie", "$WEBVPN_TICKET_COOKIE=$ticket").build()
+                .header("Cookie", ticketCookie()).build()
         ).execute().use { resp ->
             if (!resp.isSuccessful) null else resp.body?.bytes()
         } ?: return null
@@ -154,11 +156,11 @@ class HfutClient(
     }
 
     /** 取登录表单 execution 值（只带 WebVPN ticket） */
-    private fun fetchExecution(ticket: String): String {
+    private fun fetchExecution(): String {
         val url = "$casBase/cas/login?service=${enc(SERVICE)}"
         val html = http.newCall(
             Request.Builder().url(url).header("User-Agent", UA)
-                .header("Cookie", "$WEBVPN_TICKET_COOKIE=$ticket").build()
+                .header("Cookie", ticketCookie()).build()
         ).execute().use { it.body?.string().orEmpty() }
         val m = Regex("""name=["']execution["'][^>]*value=["']([^"']+)["']""").find(html)
             ?: Regex("""value=["']([^"']+)["'][^>]*name=["']execution["']""").find(html)
@@ -185,12 +187,15 @@ class HfutClient(
      * @param captcha 验证码（需要时必填）
      */
     fun loginAndFetch(username: String, password: String, captcha: String): ParsedSchedule {
+        // 0) 重新建立 WebVPN 会话：多次尝试后旧 ticket 可能失效，必须拿新的
+        cookies.clear()
+        webvpnTicket()
+        log("ticket refreshed: ${cookies[WEBVPN_TICKET_COOKIE]?.value?.take(8)}…")
         // 1) AES 密钥（桥接接口；仅用于加密，不作为 CAS 请求的 Cookie）
         val key = aesKey(casCookies())
-        // 2) WebVPN 会话 ticket：登录页/验证码/提交三者必须使用同一个 ticket 会话
-        val ticket = webvpnTicket()
-        val cookieHeader = "$WEBVPN_TICKET_COOKIE=$ticket"
-        val execution = fetchExecution(ticket)
+        // 2) 登录页/验证码/提交共用同一 WebVPN 会话；每次请求取最新轮换后的 ticket
+        val cookieHeader = ticketCookie()
+        val execution = fetchExecution()
 
         val encrypted = encryptPassword(password, key)
         // 3) 与网页登录一致：先做账号密码预检，能拿到服务端准确原因
@@ -199,7 +204,7 @@ class HfutClient(
             if (captcha.isNotBlank()) "&capcha=${enc(captcha)}" else ""
         val policy = http.newCall(
             Request.Builder().url(policyUrl).header("User-Agent", UA)
-                .header("Cookie", cookieHeader).build()
+                .header("Cookie", ticketCookie()).build()
         ).execute().use { it.body?.string().orEmpty() }
         log("policy: len=${policy.length} head=${policy.take(120)}")
         // {"code":1,...} 表示通过；其余为失败（message 为服务端原因）
@@ -225,7 +230,7 @@ class HfutClient(
         val loginUrl = "$casBase/cas/login?service=${enc(SERVICE)}"
         val (code, location, body) = http.newCall(
             Request.Builder().url(loginUrl).header("User-Agent", UA)
-                .header("Cookie", cookieHeader)
+                .header("Cookie", ticketCookie())
                 .post(form).build()
         ).execute().use { resp ->
             Triple(
@@ -259,7 +264,7 @@ class HfutClient(
             http.newCall(
                 Request.Builder().url("$eamsBase/neusoft-sso/login")
                     .header("User-Agent", UA)
-                    .header("Cookie", "$WEBVPN_TICKET_COOKIE=$ticket")
+                    .header("Cookie", ticketCookie())
                     .build()
             ).execute().close()
         }

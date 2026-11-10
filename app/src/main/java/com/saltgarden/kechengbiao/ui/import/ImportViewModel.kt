@@ -280,6 +280,8 @@ class ImportViewModel(app: Application) : AndroidViewModel(app) {
     fun openHfutLogin() = viewModelScope.launch(Dispatchers.IO) {
         _state.update { it.copy(hfutLoginVisible = true, hfutBusy = true, hfutError = null) }
         try {
+            // 每次打开弹窗重建客户端，避免复用上一轮失效的 WebVPN 会话
+            hfutClient = null
             val client = hfutClientInstance()
             val init = client.checkInit()
             val bmp = if (init.needCaptcha) client.fetchCaptcha() else null
