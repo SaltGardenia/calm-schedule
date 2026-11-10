@@ -187,10 +187,9 @@ class HfutClient(
      * @param captcha 验证码（需要时必填）
      */
     fun loginAndFetch(username: String, password: String, captcha: String): ParsedSchedule {
-        // 0) 重新建立 WebVPN 会话：多次尝试后旧 ticket 可能失效，必须拿新的
-        cookies.clear()
+        // 0) 沿用本次弹窗打开的会话（验证码与提交必须同一会话）；无会话时补建
         webvpnTicket()
-        log("ticket refreshed: ${cookies[WEBVPN_TICKET_COOKIE]?.value?.take(8)}…")
+        log("ticket: ${cookies[WEBVPN_TICKET_COOKIE]?.value?.take(8)}…")
         // 1) AES 密钥（桥接接口；仅用于加密，不作为 CAS 请求的 Cookie）
         val key = aesKey(casCookies())
         // 2) 登录页/验证码/提交共用同一 WebVPN 会话；每次请求取最新轮换后的 ticket
