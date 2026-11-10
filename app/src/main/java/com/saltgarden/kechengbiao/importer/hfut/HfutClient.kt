@@ -268,15 +268,20 @@ class HfutClient(
             throw ImportException("登录未通过（HTTP $code），请改用网页登录")
         }
 
-        // 4) 建立教务会话（WebVPN ticket 换取教务访问权）
+        // 4) 建立教务会话：必须走 CAS 返回的完整跳转地址（带 ticket 参数），
+        //    否则 EAMS 侧不认为已认证
+        val ssoUrl = location.ifBlank { "$eamsBase/neusoft-sso/login" }
+        log("sso: ${ssoUrl.take(120)}")
         runCatching {
-            http.newCall(
-                Request.Builder().url("$eamsBase/neusoft-sso/login")
+            val resp = http.newCall(
+                Request.Builder().url(ssoUrl)
                     .header("User-Agent", UA)
                     .header("Cookie", ticketCookie())
                     .build()
-            ).execute().close()
-        }
+            ).execute()
+            log("sso result: http=${resp.code} final=${resp.request.url.toString().take(90)}")
+            resp.close()
+        }.onFailure { log("sso error: ${it.message}") }
 
         // 4) 学生 id
         val tableUrl = "$eamsBase/for-std/course-table"
@@ -285,6 +290,7 @@ class HfutClient(
         ).execute().use { resp ->
             val finalUrl = resp.request.url.toString()
             val html = resp.body?.string().orEmpty()
+            log("course-table: http=${resp.code} final=${finalUrl.take(90)} len=${html.length}")
             val sid = Regex("""course-table/info/(\d+)""").find(finalUrl)?.groupValues?.get(1)
                 ?: Regex("""course-table/info/(\d+)""").find(html)?.groupValues?.get(1)
                 ?: Regex("""button[^>]*value=["'](\d{4,})["']""").find(html)?.groupValues?.get(1)
@@ -297,6 +303,7 @@ class HfutClient(
             Request.Builder().url("$eamsBase/for-std/course-table/info/$studentId")
                 .header("User-Agent", UA).build()
         ).execute().use { it.body?.string().orEmpty() }
+        log("info page: len=${infoHtml.length}")
         val bizTypeId = Regex("""bizTypeId\s*:\s*(\d+)""").find(infoHtml)?.groupValues?.get(1)
             ?: Regex("""bizTypeId\s*:\s*(\d+)""").find(tableHtml)?.groupValues?.get(1)
             ?: throw ImportException("未找到课表参数（bizTypeId）")
@@ -323,6 +330,7 @@ class HfutClient(
                 (el as? JsonObject)?.get("lessonIds") as? JsonArray
             }?.mapNotNull { (it as? JsonPrimitive)?.content?.toIntOrNull() }
         }.getOrNull().orEmpty()
+        log("lessonIds: ${lessonIds.size}")
         if (lessonIds.isEmpty()) throw ImportException("未获取到课程列表，请确认本学期已选课")
 
         // 8) 逐周课表 JSON
@@ -338,6 +346,7 @@ class HfutClient(
                 .post(bodyJson.toRequestBody("application/json".toMediaType()))
                 .build()
         ).execute().use { it.body?.string().orEmpty() }
+        log("datum: len=${datumJson.length} hasList=${datumJson.contains("scheduleList")}")
         if (!datumJson.contains("\"scheduleList\"")) {
             throw ImportException("教务系统未返回课表数据，请稍后重试或改用网页登录")
         }
