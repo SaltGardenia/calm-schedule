@@ -236,20 +236,20 @@ class HfutClient(
         }
         val succeeded = location.contains("ticket=") || (code in 300..399 && location.isNotEmpty())
         log("login result: http=$code location=${location.take(80)} " +
-            "hasPwdErr=${body.contains("密码错误")} hasCapErr=${body.contains("验证码")} " +
+            "pwdErr=${body.contains("用户名或密码错误")} " +
+            "capErr=${body.contains("验证码错误") || body.contains("验证码不正确")} " +
             "bodyLen=${body.length}")
         if (!succeeded) {
-            // 保留失败响应体（不含密码），便于排查二次确认/信息采集等非密码类失败
+            // 保留失败响应体（不含密码），便于排查
             runCatching { saveFailure?.invoke(body) }
-        }
-        if (!succeeded) {
-            if (body.contains("验证码")) {
-                throw ImportException("验证码不正确，已自动刷新，请重试")
-            }
-            if (body.contains("密码错误") || body.contains("用户名或密码")) {
+            // 注意顺序：登录页永远包含「验证码」输入框，必须先判定账号密码类错误
+            if (body.contains("用户名或密码错误") || body.contains("密码错误")) {
                 throw ImportException(
-                    "账号或密码不正确。若确认密码无误，请再试一次（验证码/登录会话刷新后即可正常登录）"
+                    "账号或密码不正确。请点「显示」核对密码（注意系统自动填充可能填了旧密码）"
                 )
+            }
+            if (body.contains("验证码错误") || body.contains("验证码不正确") || body.contains("验证码已失效")) {
+                throw ImportException("验证码不正确或已过期，已自动刷新，请重试")
             }
             throw ImportException("登录未通过（HTTP $code），请改用网页登录")
         }
