@@ -30,6 +30,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.saltgarden.kechengbiao.ui.theme.GlassDialog
 import com.saltgarden.kechengbiao.ui.theme.GlassDialogButton
@@ -77,12 +78,27 @@ fun HfutLoginDialog(
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
+        var passwordVisible by remember { mutableStateOf(false) }
         OutlinedTextField(
             value = password,
             onValueChange = { password = it },
             label = { Text("密码") },
             singleLine = true,
-            visualTransformation = PasswordVisualTransformation(),
+            visualTransformation = if (passwordVisible) {
+                VisualTransformation.None
+            } else {
+                PasswordVisualTransformation()
+            },
+            trailingIcon = {
+                Text(
+                    if (passwordVisible) "隐藏" else "显示",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier
+                        .clickable { passwordVisible = !passwordVisible }
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                )
+            },
             modifier = Modifier.fillMaxWidth(),
         )
         if (state.hfutNeedCaptcha) {

@@ -173,13 +173,17 @@ class HfutClient {
      * @param captcha 验证码（需要时必填）
      */
     fun loginAndFetch(username: String, password: String, captcha: String): ParsedSchedule {
-        // 1) WebVPN ticket + CAS 会话 Cookie + AES 密钥
+        // 1) WebVPN ticket + CAS 会话 Cookie
         val casCookie = casCookies()
-        val key = aesKey(casCookie)
 
-        // 2) 登录；打开过登录页后桥接 Cookie 会补齐 SESSION，提交时用最新值
+        // 2) 打开登录页（拿 execution，并让桥接 Cookie 补齐 SESSION）
         val execution = fetchExecution(casCookie)
         val postCookies = runCatching { casCookies() }.getOrDefault(casCookie)
+        // 密钥必须与提交时的 Cookie 属于同一 CAS 会话，否则服务端解密失败 → "密码错误"
+        val key = aesKey(postCookies)
+        // WebVPN 会话 ticket 与 CAS Cookie 必须同时携带（显式 Cookie 头会覆盖 jar）
+        val cookieHeader = "${WEBVPN_TICKET_COOKIE}=${webvpnTicket()}; $postCookies"
+
         val form = FormBody.Builder()
             .add("username", username)
             .add("password", encryptPassword(password, key))
@@ -190,7 +194,7 @@ class HfutClient {
         val loginUrl = "$casBase/cas/login?service=${enc(SERVICE)}"
         val (code, location, body) = http.newCall(
             Request.Builder().url(loginUrl).header("User-Agent", UA)
-                .header("Cookie", postCookies)
+                .header("Cookie", cookieHeader)
                 .post(form).build()
         ).execute().use { resp ->
             Triple(
@@ -201,11 +205,15 @@ class HfutClient {
         }
         val succeeded = location.contains("ticket=") || (code in 300..399 && location.isNotEmpty())
         if (!succeeded) {
-            if (body.contains("密码错误") || body.contains("用户名或密码")) {
-                throw ImportException("用户名或密码错误")
+            if (body.contains("验证码")) {
+                throw ImportException("验证码不正确，已自动刷新，请重试")
             }
-            if (body.contains("验证码")) throw ImportException("验证码不正确，已自动刷新，请重试")
-            throw ImportException("登录未通过，请检查账号密码或改用网页登录")
+            if (body.contains("密码错误") || body.contains("用户名或密码")) {
+                throw ImportException(
+                    "账号或密码不正确。若确认密码无误，请再试一次（验证码/登录会话刷新后即可正常登录）"
+                )
+            }
+            throw ImportException("登录未通过（HTTP $code），请改用网页登录")
         }
 
         // 3) 建立教务会话（WebVPN ticket 换取教务访问权）

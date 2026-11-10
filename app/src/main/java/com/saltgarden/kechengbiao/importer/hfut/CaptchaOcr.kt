@@ -29,17 +29,36 @@ object CaptchaOcr {
         model
     }.getOrNull()
 
-    /** 灰度化，提升验证码对比度（与参考实现一致的预处理） */
+    /** 灰度 + 对比度拉伸 + 二值化 + 放大 2 倍：验证码噪点多、字小，直接识别准确率很低 */
     private fun preprocess(bitmap: Bitmap): Bitmap {
         val width = bitmap.width
         val height = bitmap.height
-        val out = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val gray = IntArray(width * height)
+        var min = 255
+        var max = 0
         for (y in 0 until height) {
             for (x in 0 until width) {
                 val pixel = bitmap.getPixel(x, y)
-                val gray = (0.299 * Color.red(pixel) + 0.587 * Color.green(pixel) +
+                val g = (0.299 * Color.red(pixel) + 0.587 * Color.green(pixel) +
                     0.114 * Color.blue(pixel)).toInt().coerceIn(0, 255)
-                out.setPixel(x, y, Color.rgb(gray, gray, gray))
+                gray[y * width + x] = g
+                if (g < min) min = g
+                if (g > max) max = g
+            }
+        }
+        // 对比度拉伸到 0..255，再以中值阈值二值化
+        val span = (max - min).coerceAtLeast(1)
+        val out = Bitmap.createBitmap(width * 2, height * 2, Bitmap.Config.ARGB_8888)
+        for (y in 0 until height) {
+            for (x in 0 until width) {
+                val stretched = (gray[y * width + x] - min) * 255 / span
+                val v = if (stretched < 128) 0 else 255
+                val color = Color.rgb(v, v, v)
+                // 2x 放大（Tesseract 对 ~30px 字高识别最好）
+                out.setPixel(x * 2, y * 2, color)
+                out.setPixel(x * 2 + 1, y * 2, color)
+                out.setPixel(x * 2, y * 2 + 1, color)
+                out.setPixel(x * 2 + 1, y * 2 + 1, color)
             }
         }
         return out
