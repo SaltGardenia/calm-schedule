@@ -32,9 +32,12 @@ object GenericHtmlParser {
             .filter { it.courses.isNotEmpty() }
             .maxByOrNull { it.courses.size }
             ?.let { best ->
-                // 金智 EAMS 页面网格自带学校真实作息，一并带出
+                // 金智 EAMS 页面网格自带学校真实作息与"第 N 周"视图信息，一并带出
                 if (best.systemId == "eams") {
-                    best.copy(nodeTimes = com.saltgarden.kechengbiao.importer.eams.EamsParser.extractNodeTimes(html))
+                    best.copy(
+                        nodeTimes = com.saltgarden.kechengbiao.importer.eams.EamsParser.extractNodeTimes(html),
+                        singleWeek = com.saltgarden.kechengbiao.importer.eams.EamsParser.detectSingleWeek(html),
+                    )
                 } else best
             }
     }

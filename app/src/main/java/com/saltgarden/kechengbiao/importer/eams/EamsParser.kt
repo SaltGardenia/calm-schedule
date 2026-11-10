@@ -109,6 +109,20 @@ object EamsParser {
     }
 
     /**
+     * 判断抓取页面是否为"第 N 周"单周视图：
+     * 教务的"全部周次"汇总视图给出的是默认教室，按周视图才是当周真实教室（可能不同）。
+     * 周次下拉是 selectize 组件，选中值在 select 后的 div.item[data-value] 上。
+     */
+    fun detectSingleWeek(html: String): Int? {
+        val doc = Jsoup.parse(html)
+        val select = doc.selectFirst("select#weeks") ?: return null
+        val item = select.nextElementSibling()?.selectFirst("div.item[data-value]")
+            ?: doc.selectFirst("div.selectize-input div.item[data-value]")
+            ?: return null
+        return item.attr("data-value").trim().toIntOrNull()
+    }
+
+    /**
      * 从页面网格的 blank-unit 提取学校真实作息（每节起止时间）：
      *   <div class="blank-unit" start-time="800" end-time="845">
      * 时间为 "hmm" 紧凑格式（800=08:00，1455=14:55）。每天重复一份，去重后得到逐节作息。

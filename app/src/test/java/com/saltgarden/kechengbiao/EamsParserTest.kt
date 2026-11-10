@@ -46,6 +46,24 @@ class EamsParserTest {
     }
 
     @Test
+    fun `识别单周视图`() {
+        fun page(value: String) = """
+            <html><body>
+            <select class="form-control" name="weeks" id="weeks" style="display:none;">
+              <option value="$value" selected="selected">全部周次</option>
+            </select>
+            <div class="selectize-control">
+              <div class="selectize-input"><div class="item" data-value="$value">全部周次</div></div>
+            </div>
+            </body></html>
+        """.trimIndent()
+        // "all" = 全部周次视图 → 不按周修正
+        assertEquals(null, com.saltgarden.kechengbiao.importer.eams.EamsParser.detectSingleWeek(page("all")))
+        // 选中第 10 周 → 单周视图
+        assertEquals(10, com.saltgarden.kechengbiao.importer.eams.EamsParser.detectSingleWeek(page("10")))
+    }
+
+    @Test
     fun `从页面网格提取学校真实作息`() {
         // 结构取自真实抓取页面（blank-unit 每天重复一份，紧凑时间 800=08:00 / 1455=14:55）
         val html = """

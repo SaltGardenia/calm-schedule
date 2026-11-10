@@ -19,6 +19,8 @@ data class ParsedSchedule(
     val systemId: String = "",
     /** 学校真实作息（"08:00" to "08:45" 列表）；null = 未知，保留课表现有作息 */
     val nodeTimes: List<Pair<String, String>>? = null,
+    /** 抓取页面为"第 N 周"单周视图时给出的周次：只按该周修正课程/教室，不动其他周 */
+    val singleWeek: Int? = null,
 )
 
 class ImportException(message: String) : Exception(message)

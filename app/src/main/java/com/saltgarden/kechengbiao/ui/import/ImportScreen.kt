@@ -219,6 +219,13 @@ private fun PreviewStep(vm: ImportViewModel, state: ImportUiState, onImported: (
             Column(Modifier.weight(1f)) {
                 Text("识别到 ${parsed.courses.size} 条课程安排", style = MaterialTheme.typography.titleMedium)
                 Text("来源：${parsed.sourceName}", style = MaterialTheme.typography.bodySmall)
+                parsed.singleWeek?.let { w ->
+                    Text(
+                        "第 $w 周视图：将只修正该周的课程与教室，其他周保持不变",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
             }
             Checkbox(checked = state.selected.size == parsed.courses.size, onCheckedChange = vm::selectAll)
             Text("全选")
@@ -268,7 +275,11 @@ private fun PreviewStep(vm: ImportViewModel, state: ImportUiState, onImported: (
             }
         }
         Text(
-            "覆盖导入将清空当前课表再写入；追加导入会跳过明显重复的课程。",
+            if (parsed.singleWeek != null) {
+                "单周视图：按「课程名 + 星期 + 节次」匹配现有课程，把该周拆出并按当周教室写入。"
+            } else {
+                "覆盖导入将清空当前课表再写入；追加导入会跳过明显重复的课程。"
+            },
             style = MaterialTheme.typography.bodySmall,
             modifier = Modifier.padding(top = 6.dp)
         )

@@ -286,8 +286,16 @@ class ImportViewModel(app: Application) : AndroidViewModel(app) {
                         source = parsed.systemId.ifBlank { CourseEntity.SOURCE_MANUAL },
                     )
                 }
-            if (replace) container.repository.importReplace(tableId, entities)
-            else container.repository.importMerge(tableId, entities)
+            // 单周视图（教务"第 N 周"页面）：只按该周修正课程与教室，不动其他周。
+            // 教务的"全部周次"汇总视图给的是默认教室，按周视图才是当周真实教室（可能不同）。
+            val weekView = parsed.singleWeek
+            val weekFixed = if (weekView != null) {
+                mergeWeekView(tableId, weekView, entities, existing)
+            } else {
+                if (replace) container.repository.importReplace(tableId, entities)
+                else container.repository.importMerge(tableId, entities)
+                entities.size
+            }
 
             // 节数按导入实际情况初始化 = 导入后全部课程的最晚结束节次；
             // 作息：来源页面自带学校真实作息时（如金智 EAMS）写入完整作息 CSV，
@@ -323,8 +331,13 @@ class ImportViewModel(app: Application) : AndroidViewModel(app) {
                 }
             }
             withContext(Dispatchers.Main) {
+                val msg = if (weekView != null) {
+                    "已按第 $weekView 周更新 $weekFixed 处课程（其他周不变）"
+                } else {
+                    "已导入 $weekFixed 条课程安排"
+                }
                 android.widget.Toast.makeText(
-                    getApplication(), "已导入 ${entities.size} 条课程安排", android.widget.Toast.LENGTH_SHORT
+                    getApplication(), msg, android.widget.Toast.LENGTH_SHORT
                 ).show()
                 _state.update {
                     it.copy(step = ImportStep.Choose, parsed = null, selected = emptySet(), busy = false, error = null)
@@ -334,6 +347,47 @@ class ImportViewModel(app: Application) : AndroidViewModel(app) {
         } catch (e: Exception) {
             _state.update { it.copy(busy = false, error = friendly(e, "写入数据库失败")) }
         }
+    }
+
+    /**
+     * 按"第 N 周"视图修正课程：对每条抓取课程，找到同课名+同星期+同节次的现有课程，
+     * 若该周已包含且教室一致则跳过；否则把该周从原课程周次中拆出，单独按当周教室建一条。
+     * 不删除任何其他周的数据。返回实际修正/新增的条数。
+     */
+    private suspend fun mergeWeekView(
+        tableId: Long,
+        week: Int,
+        incoming: List<CourseEntity>,
+        existing: List<CourseEntity>,
+    ): Int {
+        var changed = 0
+        val current = existing.toMutableList()
+        for (c in incoming) {
+            val same = current.filter {
+                it.name == c.name && it.day == c.day &&
+                    it.startNode == c.startNode && it.endNode == c.endNode
+            }
+            // 该周已与抓取值一致 → 无需处理
+            if (same.any { it.room == c.room && WeekCalculator.parseWeeks(it.weeks).contains(week) }) continue
+
+            val covering = same.firstOrNull { WeekCalculator.parseWeeks(it.weeks).contains(week) }
+            if (covering != null) {
+                val rest = WeekCalculator.parseWeeks(covering.weeks) - week
+                if (rest.isEmpty()) {
+                    container.repository.deleteCourse(covering)
+                    current.remove(covering)
+                } else {
+                    val updated = covering.copy(weeks = WeekCalculator.weeksToCsv(rest))
+                    container.repository.updateCourse(updated)
+                    current[current.indexOf(covering)] = updated
+                }
+            }
+            val single = c.copy(weeks = week.toString())
+            container.repository.insertCourse(single)
+            current += single
+            changed++
+        }
+        return changed
     }
 
     // JSON 导入的原文（用于读取开学日期等元数据）；importText 时记录
