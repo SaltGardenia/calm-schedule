@@ -24,13 +24,12 @@ object SchoolRegistry {
             url = "https://webvpn.hfut.edu.cn/http/77726476706e69737468656265737421" +
                 "f3f652d22f367d44300d8db9d6562d/cas/login" +
                 "?service=https%3A%2F%2Fwebvpn.hfut.edu.cn%2Flogin%3Fcas_login%3Dtrue",
-            entrance = "WebVPN 统一身份认证",
+            entrance = "统一身份认证 · 应用内登录自动导入",
             steps = listOf(
-                "登录统一身份认证（WebVPN）",
-                "打开「信息门户」",
-                "进入「教务系统 - 学生端」",
-                "打开「我的课表」",
-                "点击底部「抓取本页课表」完成导入",
+                "输入学号与密码（验证码会自动识别填充）",
+                "点击「登录并导入」，自动完成登录与课表抓取",
+                "核对识别结果后点「覆盖导入」",
+                "如登录失败，可改用网页登录作为兜底",
             ),
         ),
         School(

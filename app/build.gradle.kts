@@ -66,6 +66,8 @@ dependencies {
     implementation(libs.jsoup)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.kotlinx.coroutines.android)
+    // 合肥工业大学原生登录：验证码自动识别
+    implementation(libs.tesseract4android)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

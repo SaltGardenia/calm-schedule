@@ -21,6 +21,8 @@ dependencyResolutionManagement {
         }
         google()
         mavenCentral()
+        // 验证码 OCR（tesseract4android）发布在 JitPack
+        maven("https://jitpack.io")
     }
 }
 

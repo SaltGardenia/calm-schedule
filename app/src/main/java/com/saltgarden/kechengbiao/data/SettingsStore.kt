@@ -17,8 +17,29 @@ class SettingsStore(private val context: Context) {
     private val keyActiveTable = longPreferencesKey("active_table_id")
     private val keyTimelineStart = stringPreferencesKey("timeline_start")
     private val keyTimelineEnd = stringPreferencesKey("timeline_end")
+    private val keyHfutUser = stringPreferencesKey("hfut_user")
+    private val keyHfutPassword = stringPreferencesKey("hfut_password")
 
     val activeTableId: Flow<Long> = context.dataStore.data.map { it[keyActiveTable] ?: 0L }
+
+    /** 合肥工业大学原生登录：记住的账号密码（仅存本机私有目录，用于下次免输入） */
+    val hfutUser: Flow<String> = context.dataStore.data.map { it[keyHfutUser] ?: "" }
+    val hfutPassword: Flow<String> = context.dataStore.data.map { it[keyHfutPassword] ?: "" }
+
+    suspend fun setHfutCredentials(user: String, password: String) {
+        context.dataStore.edit {
+            it[keyHfutUser] = user
+            it[keyHfutPassword] = password
+        }
+    }
+
+    /** 取消"记住账号密码"时清除本机保存的凭据 */
+    suspend fun clearHfutCredentials() {
+        context.dataStore.edit {
+            it.remove(keyHfutUser)
+            it.remove(keyHfutPassword)
+        }
+    }
 
     /** 时间轴自定义显示范围（"HH:mm"）；空串表示未自定义（按作息与节数自动计算） */
     val timelineStart: Flow<String> = context.dataStore.data.map { it[keyTimelineStart] ?: "" }

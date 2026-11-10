@@ -9,6 +9,8 @@ import com.saltgarden.kechengbiao.data.CourseEntity
 import com.saltgarden.kechengbiao.core.time.WeekCalculator
 import com.saltgarden.kechengbiao.importer.core.SchoolHttpClient
 import com.saltgarden.kechengbiao.importer.generic.GenericHtmlParser
+import com.saltgarden.kechengbiao.importer.hfut.CaptchaOcr
+import com.saltgarden.kechengbiao.importer.hfut.HfutClient
 import com.saltgarden.kechengbiao.importer.model.ImportCourse
 import com.saltgarden.kechengbiao.importer.model.ParsedSchedule
 import com.saltgarden.kechengbiao.importer.model.SchoolSystem
@@ -45,6 +47,13 @@ data class ImportUiState(
     /** 新版正方：学年与学期 */
     val xnm: String = defaultXnm().toString(),
     val xqmTerm: Int = defaultXqmTerm(),
+    /** 合肥工业大学原生登录弹窗 */
+    val hfutLoginVisible: Boolean = false,
+    val hfutBusy: Boolean = false,
+    val hfutNeedCaptcha: Boolean = false,
+    val hfutCaptcha: android.graphics.Bitmap? = null,
+    val hfutCaptchaText: String = "",
+    val hfutError: String? = null,
 ) {
     companion object {
         fun defaultXnm(): Int {
@@ -237,9 +246,92 @@ class ImportViewModel(app: Application) : AndroidViewModel(app) {
                 error = null,
                 parsed = parsed,
                 selected = parsed.courses.indices.toSet(),
+                hfutLoginVisible = false,
+                hfutBusy = false,
+                hfutError = null,
             )
         }
     }
+
+    // ---- 合肥工业大学：原生登录 + 全自动抓取 ----
+
+    private var hfutClient: HfutClient? = null
+
+    /** 打开原生登录弹窗：探测是否需要验证码，并自动识别验证码 */
+    fun openHfutLogin() = viewModelScope.launch(Dispatchers.IO) {
+        _state.update { it.copy(hfutLoginVisible = true, hfutBusy = true, hfutError = null) }
+        try {
+            val client = hfutClient ?: HfutClient().also { hfutClient = it }
+            val init = client.checkInit()
+            val bmp = if (init.needCaptcha) client.fetchCaptcha() else null
+            val ocr = if (bmp != null) withContext(Dispatchers.Default) {
+                CaptchaOcr.recognize(getApplication(), bmp)
+            } else ""
+            _state.update {
+                it.copy(
+                    hfutBusy = false,
+                    hfutNeedCaptcha = init.needCaptcha,
+                    hfutCaptcha = bmp,
+                    hfutCaptchaText = ocr,
+                )
+            }
+        } catch (e: Exception) {
+            _state.update {
+                it.copy(hfutBusy = false, hfutError = friendly(e, "无法连接统一认证"))
+            }
+        }
+    }
+
+    /** 刷新验证码并重新识别 */
+    fun refreshHfutCaptcha() = viewModelScope.launch(Dispatchers.IO) {
+        try {
+            val client = hfutClient ?: HfutClient().also { hfutClient = it }
+            val bmp = client.fetchCaptcha()
+            val ocr = if (bmp != null) withContext(Dispatchers.Default) {
+                CaptchaOcr.recognize(getApplication(), bmp)
+            } else ""
+            _state.update { it.copy(hfutCaptcha = bmp, hfutCaptchaText = ocr, hfutError = null) }
+        } catch (e: Exception) {
+            _state.update { it.copy(hfutError = friendly(e, "验证码获取失败")) }
+        }
+    }
+
+    fun dismissHfutLogin() = _state.update {
+        it.copy(hfutLoginVisible = false, hfutError = null)
+    }
+
+    /** 登录并自动抓取解析课表；成功后直接进入预览 */
+    fun submitHfutLogin(
+        user: String,
+        password: String,
+        captcha: String,
+        remember: Boolean = true,
+    ) = viewModelScope.launch(Dispatchers.IO) {
+        if (user.isBlank() || password.isBlank()) {
+            _state.update { it.copy(hfutError = "请输入学号与密码") }
+            return@launch
+        }
+        _state.update { it.copy(hfutBusy = true, hfutError = null) }
+        try {
+            val client = hfutClient ?: HfutClient().also { hfutClient = it }
+            val parsed = client.loginAndFetch(user.trim(), password, captcha.trim())
+            if (remember) {
+                container.settings.setHfutCredentials(user.trim(), password)
+            } else {
+                container.settings.clearHfutCredentials()
+            }
+            _state.update { it.copy(hfutBusy = false) }
+            setParsed(parsed)
+        } catch (e: Exception) {
+            _state.update { it.copy(hfutBusy = false, hfutError = friendly(e, "登录失败")) }
+            // 验证码一般一次性，失败后自动刷新
+            if (_state.value.hfutNeedCaptcha) refreshHfutCaptcha()
+        }
+    }
+
+    /** 供登录弹窗预填上次账号密码 */
+    suspend fun savedHfutCredentials(): Pair<String, String> =
+        container.settings.hfutUser.first() to container.settings.hfutPassword.first()
 
     fun toggle(index: Int) = _state.update {
         val sel = it.selected.toMutableSet()

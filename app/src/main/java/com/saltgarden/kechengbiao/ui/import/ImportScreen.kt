@@ -130,11 +130,35 @@ fun ImportScreen(vm: ImportViewModel, onBack: () -> Unit, onImported: () -> Unit
             onDismiss = { selectedSchool = null },
             onStart = {
                 selectedSchool = null
-                val intent = Intent(
-                    context, WebViewGrabActivity::class.java
-                ).putExtra(WebViewGrabActivity.EXTRA_URL, school.url)
-                grabLauncher.launch(intent)
+                if (school.id == "hfut") {
+                    // 合肥工业大学：原生登录界面 + 全自动抓取（含验证码自动识别）
+                    vm.openHfutLogin()
+                } else {
+                    val intent = Intent(
+                        context, WebViewGrabActivity::class.java
+                    ).putExtra(WebViewGrabActivity.EXTRA_URL, school.url)
+                    grabLauncher.launch(intent)
+                }
             }
+        )
+    }
+
+    if (state.hfutLoginVisible) {
+        HfutLoginDialog(
+            state = state,
+            onDismiss = vm::dismissHfutLogin,
+            onSubmit = { u, p, c, remember -> vm.submitHfutLogin(u, p, c, remember) },
+            onRefreshCaptcha = vm::refreshHfutCaptcha,
+            onWebFallback = {
+                vm.dismissHfutLogin()
+                SchoolRegistry.byId("hfut")?.let { hfut ->
+                    val intent = Intent(
+                        context, WebViewGrabActivity::class.java
+                    ).putExtra(WebViewGrabActivity.EXTRA_URL, hfut.url)
+                    grabLauncher.launch(intent)
+                }
+            },
+            savedCredentials = { vm.savedHfutCredentials() },
         )
     }
 }
